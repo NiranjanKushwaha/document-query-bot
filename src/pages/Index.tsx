@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { FileText, MessageSquare, Settings, Trash2 } from 'lucide-react';
 import { Toaster } from '@/components/ui/toaster';
 import { Button } from '@/components/ui/button';
@@ -20,6 +20,21 @@ const Index = () => {
   const [error, setError] = useState<string>();
   const [showApiDialog, setShowApiDialog] = useState(!geminiService.isInitialized());
   const [previewDocument, setPreviewDocument] = useState<Document | null>(null);
+  const [isOcrProcessing, setIsOcrProcessing] = useState(false);
+  const [ocrProgress, setOcrProgress] = useState(0);
+
+  // Listen for OCR progress events
+  useEffect(() => {
+    const handleOcrProgress = (event: CustomEvent) => {
+      const { overallProgress } = event.detail;
+      setOcrProgress(overallProgress);
+    };
+
+    window.addEventListener('ocrProgress', handleOcrProgress as EventListener);
+    return () => {
+      window.removeEventListener('ocrProgress', handleOcrProgress as EventListener);
+    };
+  }, []);
 
   // Handle file uploads
   const handleFileUpload = useCallback(async (files: File[]) => {
@@ -27,6 +42,13 @@ const Index = () => {
 
     for (const file of files) {
       try {
+        // Check if it's a PDF that might need OCR
+        const isPdf = file.type.toLowerCase().includes('pdf');
+        if (isPdf) {
+          setIsOcrProcessing(true);
+          setOcrProgress(0);
+        }
+
         const content = await DocumentService.extractTextContent(file);
         const thumbnail = await DocumentService.generateThumbnail(file);
         
@@ -42,8 +64,16 @@ const Index = () => {
         };
 
         newDocuments.push(document);
+        
+        // Reset OCR state after processing
+        if (isPdf) {
+          setIsOcrProcessing(false);
+          setOcrProgress(0);
+        }
       } catch (error) {
         console.error('Error processing file:', error);
+        setIsOcrProcessing(false);
+        setOcrProgress(0);
         toast({
           title: "Upload Error",
           description: `Failed to process ${file.name}`,
@@ -239,6 +269,8 @@ const Index = () => {
                 onSendMessage={handleSendMessage}
                 isLoading={isLoading}
                 error={error}
+                isOcrProcessing={isOcrProcessing}
+                ocrProgress={ocrProgress}
               />
             </Card>
           </div>

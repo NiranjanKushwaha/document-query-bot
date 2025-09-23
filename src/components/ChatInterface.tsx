@@ -11,6 +11,8 @@ interface ChatInterfaceProps {
   onSendMessage: (message: string) => Promise<void>;
   isLoading: boolean;
   error?: string;
+  ocrProgress?: number;
+  isOcrProcessing?: boolean;
 }
 
 export const ChatInterface: React.FC<ChatInterfaceProps> = ({
@@ -18,6 +20,8 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
   onSendMessage,
   isLoading,
   error,
+  ocrProgress = 0,
+  isOcrProcessing = false,
 }) => {
   const [inputMessage, setInputMessage] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -148,15 +152,25 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
           ))
         )}
 
-        {isLoading && (
+        {(isLoading || isOcrProcessing) && (
           <div className="flex justify-start">
             <Card className="max-w-[80%] p-4 bg-card border-muted chat-message">
               <div className="flex items-center space-x-3">
                 <div className="w-8 h-8 bg-gradient-primary rounded-full flex items-center justify-center">
                   <Loader2 className="w-5 h-5 text-white animate-spin" />
                 </div>
-                <div className="text-sm text-muted-foreground">
-                  Processing your question...
+                <div className="flex-1">
+                  <div className="text-sm text-muted-foreground mb-2">
+                    {isOcrProcessing ? 'Processing image-based PDF with OCR...' : 'Processing your question...'}
+                  </div>
+                  {isOcrProcessing && (
+                    <div className="w-full bg-gray-200 rounded-full h-2">
+                      <div 
+                        className="bg-gradient-primary h-2 rounded-full transition-all duration-300" 
+                        style={{ width: `${ocrProgress}%` }}
+                      ></div>
+                    </div>
+                  )}
                 </div>
               </div>
             </Card>

@@ -3,6 +3,7 @@ import * as pdfjsLib from 'pdfjs-dist';
 import mammoth from 'mammoth';
 import * as XLSX from 'xlsx';
 import JSZip from 'jszip';
+import Tesseract from 'tesseract.js';
 
 // Configure PDF.js worker
 try {
@@ -108,8 +109,15 @@ export class DocumentService {
           if (fullText.trim()) {
             resolve(`PDF Content from ${file.name}:\n\n${fullText.trim()}`);
           } else {
-            console.warn('No text extracted from PDF - likely image-based');
-            resolve(`PDF file: ${file.name} (${Math.round(file.size / 1024)} KB)\n\n⚠️ This PDF appears to be image-based and contains no extractable text.\n\n💡 Suggestions:\n• Use an OCR tool (like Adobe Acrobat, Google Drive, or online OCR services) to convert the images to text\n• Convert the PDF to a text-based format\n• Take screenshots and use image-to-text tools\n\nI can only analyze text-based content, so I cannot answer questions about this document until it's converted to text.`);
+            console.warn('No text extracted from PDF - attempting OCR');
+            // Try OCR for image-based PDFs
+            try {
+              const ocrText = await this.extractPdfTextWithOCR(file);
+              resolve(ocrText);
+            } catch (ocrError) {
+              console.error('OCR failed:', ocrError);
+              resolve(`PDF file: ${file.name} (${Math.round(file.size / 1024)} KB)\n\n⚠️ This PDF appears to be image-based and OCR processing failed.\n\n💡 Suggestions:\n• Use an OCR tool (like Adobe Acrobat, Google Drive, or online OCR services) to convert the images to text\n• Convert the PDF to a text-based format\n• Take screenshots and use image-to-text tools\n\nI can only analyze text-based content, so I cannot answer questions about this document until it's converted to text.`);
+            }
           }
         } catch (error: unknown) {
           console.error('Error extracting PDF text:', error);
@@ -328,5 +336,97 @@ export class DocumentService {
     if (fileType.includes('excel') || fileType.includes('sheet')) return '📊';
     if (fileType.includes('presentation') || fileType.includes('powerpoint')) return '📽️';
     return '📁';
+  }
+
+  private static async extractPdfTextWithOCR(file: File): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        try {
+          console.log('Starting OCR processing for PDF:', file.name);
+          const arrayBuffer = e.target?.result as ArrayBuffer;
+          if (!arrayBuffer) {
+            reject(new Error('Failed to read PDF file'));
+            return;
+          }
+
+          // Load PDF document
+          const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+          console.log('PDF loaded for OCR, pages:', pdf.numPages);
+          
+          let fullText = '';
+          const totalPages = pdf.numPages;
+
+          // Process pages sequentially to show progress
+          for (let i = 1; i <= totalPages; i++) {
+            console.log(`Processing page ${i} of ${totalPages}`);
+            const pageText = await this.processPageWithOCR(pdf, i, i, totalPages);
+            fullText += pageText + '\n\n';
+          }
+
+          console.log('OCR completed, total text length:', fullText.length);
+          
+          if (fullText.trim()) {
+            resolve(`PDF Content from ${file.name} (OCR Processed):\n\n${fullText.trim()}`);
+          } else {
+            reject(new Error('No text could be extracted with OCR'));
+          }
+        } catch (error: unknown) {
+          console.error('Error in OCR processing:', error);
+          reject(error);
+        }
+      };
+      reader.onerror = (e) => reject(e);
+      reader.readAsArrayBuffer(file);
+    });
+  }
+
+  private static async processPageWithOCR(pdf: pdfjsLib.PDFDocumentProxy, pageNumber: number, currentPage: number, totalPages: number): Promise<string> {
+    try {
+      console.log(`Processing page ${pageNumber} with OCR`);
+      const page = await pdf.getPage(pageNumber);
+      
+      // Render page to canvas
+      const viewport = page.getViewport({ scale: 2.0 }); // Higher scale for better OCR
+      const canvas = document.createElement('canvas');
+      const context = canvas.getContext('2d');
+      canvas.height = viewport.height;
+      canvas.width = viewport.width;
+
+      await page.render({
+        canvasContext: context,
+        viewport: viewport
+      }).promise;
+
+      // Convert canvas to image data
+      const imageData = canvas.toDataURL('image/png');
+      
+      // Perform OCR on the image
+      const { data: { text } } = await Tesseract.recognize(imageData, 'eng', {
+        logger: (m) => {
+          if (m.status === 'recognizing text') {
+            const pageProgress = Math.round(m.progress * 100);
+            const overallProgress = Math.round(((currentPage - 1) + m.progress) / totalPages * 100);
+            console.log(`OCR Progress for page ${pageNumber}: ${pageProgress}% (Overall: ${overallProgress}%)`);
+            
+            // Dispatch custom event for progress tracking
+            window.dispatchEvent(new CustomEvent('ocrProgress', { 
+              detail: { 
+                page: currentPage, 
+                totalPages, 
+                pageProgress, 
+                overallProgress 
+              } 
+            }));
+          }
+        }
+      });
+
+      console.log(`Page ${pageNumber} OCR completed, text length:`, text.length);
+      return text.trim();
+    } catch (error: unknown) {
+      console.error(`Error processing page ${pageNumber} with OCR:`, error);
+      return `[Error processing page ${pageNumber} with OCR]`;
+    }
   }
 }
