@@ -1,10 +1,13 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Bot, User, AlertCircle, Loader2 } from 'lucide-react';
+import { Send, Bot, User, AlertCircle, Loader2, Download } from 'lucide-react';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { ChatMessage } from '@/types/document';
+import { PDFExportService } from '@/services/pdfExportService';
+import { useToast } from '@/hooks/use-toast';
 
 interface ChatInterfaceProps {
   messages: ChatMessage[];
@@ -23,7 +26,9 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
   ocrProgress = 0,
   isOcrProcessing = false,
 }) => {
+  const { toast } = useToast();
   const [inputMessage, setInputMessage] = useState('');
+  const [isExporting, setIsExporting] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -68,20 +73,88 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
     }
   };
 
+  const handleDownloadPDF = async () => {
+    if (messages.length === 0) {
+      toast({
+        title: "No Messages",
+        description: "There are no messages to export.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      setIsExporting(true);
+      const filename = PDFExportService.formatFilename(messages);
+      
+      try {
+        // Try the direct method first (more reliable)
+        await PDFExportService.exportChatToPDFDirect(messages, filename);
+      } catch (directError) {
+        console.warn('Direct method failed, trying HTML2Canvas method:', directError);
+        // Fallback to HTML2Canvas method
+        await PDFExportService.exportChatToPDF(messages, filename);
+      }
+      
+      toast({
+        title: "Export Successful",
+        description: "Chat conversation has been downloaded as PDF.",
+      });
+    } catch (error) {
+      console.error('Error exporting PDF:', error);
+      toast({
+        title: "Export Failed",
+        description: "Failed to export chat conversation. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
       <div className="p-4 border-b bg-gradient-card flex-shrink-0">
-        <div className="flex items-center space-x-3">
-          <div className="w-10 h-10 bg-gradient-primary rounded-full flex items-center justify-center">
-            <Bot className="w-6 h-6 text-white" />
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-3">
+            <div className="w-10 h-10 bg-gradient-primary rounded-full flex items-center justify-center">
+              <Bot className="w-6 h-6 text-white" />
+            </div>
+            <div>
+              <h2 className="text-lg font-semibold">AI Document Assistant</h2>
+              <p className="text-sm text-muted-foreground">
+                Ask questions about your uploaded documents
+              </p>
+            </div>
           </div>
-          <div>
-            <h2 className="text-lg font-semibold">AI Document Assistant</h2>
-            <p className="text-sm text-muted-foreground">
-              Ask questions about your uploaded documents
-            </p>
-          </div>
+          {messages.length > 0 && (
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    onClick={handleDownloadPDF}
+                    disabled={isExporting || isLoading || isOcrProcessing}
+                    variant="outline"
+                    size="sm"
+                    className="flex items-center space-x-2 hover:bg-gradient-primary hover:text-white transition-all duration-300"
+                  >
+                    {isExporting ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Download className="w-4 h-4" />
+                    )}
+                    <span className="hidden sm:inline">
+                      {isExporting ? 'Exporting...' : `Download PDF (${messages.length})`}
+                    </span>
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Export chat conversation as PDF</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          )}
         </div>
       </div>
 
