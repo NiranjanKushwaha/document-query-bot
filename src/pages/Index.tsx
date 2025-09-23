@@ -100,9 +100,10 @@ const Index = () => {
       };
 
       setMessages(prev => [...prev, aiMessage]);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error querying documents:', error);
-      setError(error.message || 'Failed to process your question. Please try again.');
+      const errorObj = error as Error;
+      setError(errorObj.message || 'Failed to process your question. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -163,9 +164,9 @@ const Index = () => {
   }, []);
 
   return (
-    <div className="min-h-screen bg-gradient-secondary">
+    <div className="h-screen bg-gradient-secondary flex flex-col overflow-hidden">
       {/* Header */}
-      <header className="bg-gradient-card border-b shadow-custom-sm">
+      <header className="bg-gradient-card border-b shadow-custom-sm flex-shrink-0">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
@@ -208,8 +209,8 @@ const Index = () => {
       </header>
 
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-[calc(100vh-12rem)]">
+      <main className="flex-1 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-full">
           {/* Document Panel */}
           <div className="lg:col-span-1">
             <Card className="h-full bg-gradient-card border-0 shadow-custom-md">
@@ -219,7 +220,7 @@ const Index = () => {
                   <h2 className="text-lg font-semibold">Documents</h2>
                 </div>
               </div>
-              <div className="p-4 h-[calc(100%-4rem)] overflow-y-auto">
+              <div className="p-4 h-[calc(100%-4rem)] overflow-y-auto" style={{ minHeight: '400px' }}>
                 <DocumentUpload
                   onUpload={handleFileUpload}
                   documents={documents}
@@ -232,7 +233,7 @@ const Index = () => {
 
           {/* Chat Panel */}
           <div className="lg:col-span-2">
-            <Card className="h-full bg-gradient-card border-0 shadow-custom-md overflow-hidden">
+            <Card className="h-full bg-gradient-card border-0 shadow-custom-md flex flex-col">
               <ChatInterface
                 messages={messages}
                 onSendMessage={handleSendMessage}

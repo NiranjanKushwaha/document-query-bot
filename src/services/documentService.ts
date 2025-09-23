@@ -1,5 +1,8 @@
 import { Document } from '@/types/document';
 import * as pdfjsLib from 'pdfjs-dist';
+import mammoth from 'mammoth';
+import * as XLSX from 'xlsx';
+import JSZip from 'jszip';
 
 // Configure PDF.js worker
 try {
@@ -22,11 +25,15 @@ export class DocumentService {
       } else if (fileType.includes('image')) {
         // Convert image to base64 for Gemini processing
         return await this.convertImageToBase64(file);
-      } else if (fileType.includes('word') || fileType.includes('document') || 
-                 fileType.includes('excel') || fileType.includes('sheet') ||
-                 fileType.includes('presentation') || fileType.includes('powerpoint')) {
-        // For Office documents, provide a helpful message
-        return `Office document: ${file.name} (${Math.round(file.size / 1024)} KB)\n\nNote: Office document text extraction is not yet implemented. Please convert to PDF or text format for full content analysis.`;
+      } else if (fileType.includes('word') || fileType.includes('document')) {
+        // Extract text from Word documents
+        return await this.extractWordText(file);
+      } else if (fileType.includes('excel') || fileType.includes('sheet')) {
+        // Extract text from Excel documents
+        return await this.extractExcelText(file);
+      } else if (fileType.includes('presentation') || fileType.includes('powerpoint')) {
+        // Extract text from PowerPoint documents
+        return await this.extractPowerPointText(file);
       } else {
         return `Document: ${file.name} (${Math.round(file.size / 1024)} KB) - Content extraction not supported for this file type`;
       }
@@ -89,7 +96,7 @@ export class DocumentService {
             const page = await pdf.getPage(i);
             const textContent = await page.getTextContent();
             const pageText = textContent.items
-              .map((item: any) => item.str)
+              .map((item) => 'str' in item ? item.str : '')
               .join(' ');
             fullText += pageText + '\n';
             console.log(`Page ${i} text length:`, pageText.length);
@@ -101,24 +108,25 @@ export class DocumentService {
           if (fullText.trim()) {
             resolve(`PDF Content from ${file.name}:\n\n${fullText.trim()}`);
           } else {
-            console.warn('No text extracted from PDF');
-            resolve(`PDF file: ${file.name} (${Math.round(file.size / 1024)} KB)\n\nNote: This PDF appears to be image-based or contains no extractable text. Consider using an OCR tool to convert images to text.`);
+            console.warn('No text extracted from PDF - likely image-based');
+            resolve(`PDF file: ${file.name} (${Math.round(file.size / 1024)} KB)\n\n⚠️ This PDF appears to be image-based and contains no extractable text.\n\n💡 Suggestions:\n• Use an OCR tool (like Adobe Acrobat, Google Drive, or online OCR services) to convert the images to text\n• Convert the PDF to a text-based format\n• Take screenshots and use image-to-text tools\n\nI can only analyze text-based content, so I cannot answer questions about this document until it's converted to text.`);
           }
-        } catch (error: any) {
+        } catch (error: unknown) {
           console.error('Error extracting PDF text:', error);
           
           let errorMessage = `PDF file: ${file.name} (${Math.round(file.size / 1024)} KB)\n\n`;
           
-          if (error.name === 'PasswordException') {
+          const errorObj = error as Error;
+          if (errorObj.name === 'PasswordException') {
             errorMessage += 'Note: This PDF is password-protected. Please remove the password and try again.';
-          } else if (error.name === 'InvalidPDFException') {
+          } else if (errorObj.name === 'InvalidPDFException') {
             errorMessage += 'Note: This PDF appears to be corrupted or invalid. Please try with a different PDF file.';
-          } else if (error.message?.includes('worker')) {
+          } else if (errorObj.message?.includes('worker')) {
             errorMessage += 'Note: PDF processing worker failed to load. Please refresh the page and try again.';
-          } else if (error.message?.includes('fetch')) {
+          } else if (errorObj.message?.includes('fetch')) {
             errorMessage += 'Note: Failed to load PDF processing resources. Please check your internet connection and try again.';
           } else {
-            errorMessage += `Note: Failed to extract text from this PDF. Error: ${error.message || 'Unknown error occurred'}`;
+            errorMessage += `Note: Failed to extract text from this PDF. Error: ${errorObj.message || 'Unknown error occurred'}`;
           }
           
           resolve(errorMessage);
@@ -128,6 +136,149 @@ export class DocumentService {
         console.error('FileReader error:', e);
         reject(e);
       };
+      reader.readAsArrayBuffer(file);
+    });
+  }
+
+  private static async extractWordText(file: File): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        try {
+          console.log('Starting Word text extraction for:', file.name);
+          const arrayBuffer = e.target?.result as ArrayBuffer;
+          if (!arrayBuffer) {
+            reject(new Error('Failed to read Word file'));
+            return;
+          }
+
+          const result = await mammoth.extractRawText({ arrayBuffer });
+          const text = result.value;
+          
+          if (text.trim()) {
+            console.log('Word text extracted successfully, length:', text.length);
+            resolve(`Word Document Content from ${file.name}:\n\n${text.trim()}`);
+          } else {
+            console.warn('No text extracted from Word document');
+            resolve(`Word file: ${file.name} (${Math.round(file.size / 1024)} KB)\n\nNote: This Word document appears to contain no extractable text or may be image-based.`);
+          }
+        } catch (error: unknown) {
+          console.error('Error extracting Word text:', error);
+          const errorObj = error as Error;
+          resolve(`Word file: ${file.name} (${Math.round(file.size / 1024)} KB)\n\nNote: Failed to extract text from this Word document. Error: ${errorObj.message || 'Unknown error occurred'}`);
+        }
+      };
+      reader.onerror = (e) => reject(e);
+      reader.readAsArrayBuffer(file);
+    });
+  }
+
+  private static async extractExcelText(file: File): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        try {
+          console.log('Starting Excel text extraction for:', file.name);
+          const arrayBuffer = e.target?.result as ArrayBuffer;
+          if (!arrayBuffer) {
+            reject(new Error('Failed to read Excel file'));
+            return;
+          }
+
+          const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+          let fullText = '';
+
+          // Extract text from all sheets
+          workbook.SheetNames.forEach((sheetName, index) => {
+            const worksheet = workbook.Sheets[sheetName];
+            const sheetData = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: '' });
+            
+            fullText += `\n--- Sheet: ${sheetName} ---\n`;
+            
+            // Convert sheet data to readable text
+            sheetData.forEach((row: unknown[], rowIndex) => {
+              const rowText = row.filter(cell => cell !== '' && cell !== null && cell !== undefined)
+                                .map(cell => String(cell).trim())
+                                .join(' | ');
+              if (rowText) {
+                fullText += `Row ${rowIndex + 1}: ${rowText}\n`;
+              }
+            });
+          });
+
+          if (fullText.trim()) {
+            console.log('Excel text extracted successfully, length:', fullText.length);
+            console.log('Excel content preview:', fullText.substring(0, 500));
+            resolve(`Excel Document Content from ${file.name}:\n${fullText.trim()}`);
+          } else {
+            console.warn('No text extracted from Excel document');
+            console.log('Workbook sheets:', workbook.SheetNames);
+            console.log('First sheet data:', workbook.Sheets[workbook.SheetNames[0]]);
+            resolve(`Excel file: ${file.name} (${Math.round(file.size / 1024)} KB)\n\nNote: This Excel document appears to contain no extractable data.`);
+          }
+        } catch (error: unknown) {
+          console.error('Error extracting Excel text:', error);
+          const errorObj = error as Error;
+          resolve(`Excel file: ${file.name} (${Math.round(file.size / 1024)} KB)\n\nNote: Failed to extract data from this Excel document. Error: ${errorObj.message || 'Unknown error occurred'}`);
+        }
+      };
+      reader.onerror = (e) => reject(e);
+      reader.readAsArrayBuffer(file);
+    });
+  }
+
+  private static async extractPowerPointText(file: File): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        try {
+          console.log('Starting PowerPoint text extraction for:', file.name);
+          const arrayBuffer = e.target?.result as ArrayBuffer;
+          if (!arrayBuffer) {
+            reject(new Error('Failed to read PowerPoint file'));
+            return;
+          }
+
+          const zip = new JSZip();
+          const zipContent = await zip.loadAsync(arrayBuffer);
+          let fullText = '';
+
+          // Extract text from slides
+          const slideFiles = Object.keys(zipContent.files).filter(name => 
+            name.startsWith('ppt/slides/slide') && name.endsWith('.xml')
+          );
+
+          for (const slideFile of slideFiles) {
+            const slideContent = await zipContent.files[slideFile].async('text');
+            const slideNumber = slideFile.match(/slide(\d+)\.xml/)?.[1] || 'unknown';
+            
+            // Extract text content from XML (basic text extraction)
+            const textMatches = slideContent.match(/<a:t[^>]*>([^<]*)<\/a:t>/g);
+            if (textMatches) {
+              fullText += `\n--- Slide ${slideNumber} ---\n`;
+              textMatches.forEach(match => {
+                const textContent = match.replace(/<[^>]*>/g, '').trim();
+                if (textContent) {
+                  fullText += textContent + '\n';
+                }
+              });
+            }
+          }
+
+          if (fullText.trim()) {
+            console.log('PowerPoint text extracted successfully, length:', fullText.length);
+            resolve(`PowerPoint Document Content from ${file.name}:\n${fullText.trim()}`);
+          } else {
+            console.warn('No text extracted from PowerPoint document');
+            resolve(`PowerPoint file: ${file.name} (${Math.round(file.size / 1024)} KB)\n\nNote: This PowerPoint document appears to contain no extractable text or may be image-based.`);
+          }
+        } catch (error: unknown) {
+          console.error('Error extracting PowerPoint text:', error);
+          const errorObj = error as Error;
+          resolve(`PowerPoint file: ${file.name} (${Math.round(file.size / 1024)} KB)\n\nNote: Failed to extract text from this PowerPoint document. Error: ${errorObj.message || 'Unknown error occurred'}`);
+        }
+      };
+      reader.onerror = (e) => reject(e);
       reader.readAsArrayBuffer(file);
     });
   }

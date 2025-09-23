@@ -24,14 +24,35 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    // Auto-scroll to bottom when new messages are added
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
   }, [messages]);
+
+  // Also scroll to bottom when loading state changes
+  useEffect(() => {
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [isLoading]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!inputMessage.trim() || isLoading) return;
 
     const message = inputMessage.trim();
+    
+    // Basic validation to encourage document-related questions
+    const nonDocumentKeywords = ['calculate', 'math', 'code', 'programming', 'weather', 'news', 'general', 'what is', 'how to'];
+    const isLikelyNonDocument = nonDocumentKeywords.some(keyword => 
+      message.toLowerCase().includes(keyword)
+    );
+    
+    if (isLikelyNonDocument && !message.toLowerCase().includes('document') && !message.toLowerCase().includes('file')) {
+      // Still allow the message but the AI will handle the restriction
+    }
+    
     setInputMessage('');
     await onSendMessage(message);
   };
@@ -61,17 +82,28 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
       </div>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4 min-h-0">
+      <div className="flex-1 overflow-y-auto p-4 space-y-4 chat-messages-container" style={{ minHeight: 0, maxHeight: 'calc(100vh - 200px)' }}>
         {messages.length === 0 ? (
           <div className="text-center py-8">
             <div className="w-16 h-16 mx-auto mb-4 bg-gradient-ai rounded-full flex items-center justify-center">
               <Bot className="w-8 h-8 text-ai-primary" />
             </div>
-            <h3 className="text-lg font-medium mb-2">Ready to help!</h3>
-            <p className="text-muted-foreground text-sm max-w-md mx-auto">
+            <h3 className="text-lg font-medium mb-2">Ready to analyze your documents!</h3>
+            <p className="text-muted-foreground text-sm max-w-md mx-auto mb-4">
               Upload some documents and ask me questions about their content. 
-              I can help you find information, summarize content, and answer specific queries.
+              I can help you find information, summarize content, and answer specific queries about your uploaded files.
             </p>
+            <div className="text-xs text-muted-foreground max-w-md mx-auto">
+              <p className="font-medium mb-2">💡 Try asking:</p>
+              <ul className="text-left space-y-1">
+                <li>• "Give me a summary"</li>
+                <li>• "What are the key points?"</li>
+                <li>• "Show me the data"</li>
+                <li>• "What are the main findings?"</li>
+                <li>• "Explain the details"</li>
+                <li>• "What information is available?"</li>
+              </ul>
+            </div>
           </div>
         ) : (
           messages.map((message) => (
@@ -80,7 +112,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
               className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'}`}
             >
               <Card
-                className={`max-w-[80%] p-4 ${
+                className={`max-w-[80%] p-4 chat-message ${
                   message.type === 'user'
                     ? 'bg-gradient-primary text-white'
                     : 'bg-card border-muted'
@@ -99,7 +131,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
                     )}
                   </div>
                   <div className="min-w-0 flex-1">
-                    <p className={`text-sm whitespace-pre-wrap ${
+                    <p className={`text-sm whitespace-pre-wrap break-words overflow-wrap-anywhere ${
                       message.type === 'user' ? 'text-white' : 'text-foreground'
                     }`}>
                       {message.content}
@@ -118,7 +150,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
 
         {isLoading && (
           <div className="flex justify-start">
-            <Card className="max-w-[80%] p-4 bg-card border-muted">
+            <Card className="max-w-[80%] p-4 bg-card border-muted chat-message">
               <div className="flex items-center space-x-3">
                 <div className="w-8 h-8 bg-gradient-primary rounded-full flex items-center justify-center">
                   <Loader2 className="w-5 h-5 text-white animate-spin" />
@@ -133,8 +165,8 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
 
         {error && (
           <Alert className="border-ai-error bg-ai-error/5">
-            <AlertCircle className="h-4 w-4 text-ai-error" />
-            <AlertDescription className="text-ai-error">
+            <AlertCircle className="h-4 w-4 text-ai-error flex-shrink-0" />
+            <AlertDescription className="text-ai-error break-words overflow-wrap-anywhere">
               {error}
             </AlertDescription>
           </Alert>
@@ -151,7 +183,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
             value={inputMessage}
             onChange={(e) => setInputMessage(e.target.value)}
             onKeyPress={handleKeyPress}
-            placeholder="Ask a question about your documents..."
+            placeholder="Ask about your uploaded documents (e.g., 'Give me a summary', 'What are the key points?')"
             disabled={isLoading}
             className="flex-1"
           />
@@ -164,7 +196,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
           </Button>
         </form>
         <p className="text-xs text-muted-foreground mt-2">
-          Press Enter to send, Shift+Enter for new line
+          Press Enter to send, Shift+Enter for new line. I can only answer questions about your uploaded documents.
         </p>
       </div>
     </div>
