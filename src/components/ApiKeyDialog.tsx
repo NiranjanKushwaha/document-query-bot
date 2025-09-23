@@ -8,11 +8,13 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 
 interface ApiKeyDialogProps {
   open: boolean;
+  onOpenChange: (open: boolean) => void;
   onApiKeySubmit: (apiKey: string) => void;
 }
 
 export const ApiKeyDialog: React.FC<ApiKeyDialogProps> = ({
   open,
+  onOpenChange,
   onApiKeySubmit,
 }) => {
   const [apiKey, setApiKey] = useState('');
@@ -26,8 +28,13 @@ export const ApiKeyDialog: React.FC<ApiKeyDialogProps> = ({
     }
   };
 
+  const handleCancel = () => {
+    onOpenChange(false);
+    setApiKey('');
+  };
+
   return (
-    <Dialog open={open}>
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center space-x-2">
@@ -92,6 +99,13 @@ export const ApiKeyDialog: React.FC<ApiKeyDialogProps> = ({
           </Alert>
 
           <div className="flex justify-end space-x-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handleCancel}
+            >
+              Cancel
+            </Button>
             <Button
               type="submit"
               className="bg-gradient-primary hover:bg-primary-hover"

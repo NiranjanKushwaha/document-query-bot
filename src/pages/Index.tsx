@@ -280,6 +280,7 @@ const Index = () => {
       {/* API Key Dialog */}
       <ApiKeyDialog
         open={showApiDialog}
+        onOpenChange={setShowApiDialog}
         onApiKeySubmit={handleApiKeySubmit}
       />
 
