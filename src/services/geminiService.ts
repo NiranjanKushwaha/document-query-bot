@@ -40,6 +40,7 @@ Please provide a clear and accurate answer based on the document content. If you
 
       // Process each document
       for (const doc of documents) {
+        console.log('Processing document:', doc.name, 'Type:', doc.type, 'Content length:', doc.content?.length);
         if (doc.content) {
           if (doc.type.startsWith('image/')) {
             // Handle image content
@@ -77,6 +78,7 @@ Please provide a clear and accurate answer based on the document content. If you
             }
           } else {
             // Handle text content
+            console.log('Adding text content for:', doc.name, 'Content preview:', doc.content.substring(0, 200));
             contentParts.push({
               text: `\nDocument: ${doc.name}\nContent: ${doc.content}\n\n---\n`
             });

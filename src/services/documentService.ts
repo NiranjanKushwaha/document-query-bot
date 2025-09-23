@@ -2,7 +2,12 @@ import { Document } from '@/types/document';
 import * as pdfjsLib from 'pdfjs-dist';
 
 // Configure PDF.js worker
-pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+try {
+  pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdfjs/pdf.worker.min.js';
+} catch (error) {
+  console.warn('Failed to set local PDF.js worker, falling back to CDN');
+  pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+}
 
 export class DocumentService {
   static async extractTextContent(file: File): Promise<string> {
@@ -62,37 +67,67 @@ export class DocumentService {
       const reader = new FileReader();
       reader.onload = async (e) => {
         try {
+          console.log('Starting PDF text extraction for:', file.name);
           const arrayBuffer = e.target?.result as ArrayBuffer;
           if (!arrayBuffer) {
+            console.error('Failed to read PDF file - no array buffer');
             reject(new Error('Failed to read PDF file'));
             return;
           }
 
+          console.log('PDF file size:', arrayBuffer.byteLength, 'bytes');
+
           // Load PDF document
           const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+          console.log('PDF loaded successfully, pages:', pdf.numPages);
+          
           let fullText = '';
 
           // Extract text from each page
           for (let i = 1; i <= pdf.numPages; i++) {
+            console.log(`Processing page ${i} of ${pdf.numPages}`);
             const page = await pdf.getPage(i);
             const textContent = await page.getTextContent();
             const pageText = textContent.items
               .map((item: any) => item.str)
               .join(' ');
             fullText += pageText + '\n';
+            console.log(`Page ${i} text length:`, pageText.length);
           }
+
+          console.log('Total extracted text length:', fullText.length);
+          console.log('Extracted text preview:', fullText.substring(0, 200));
 
           if (fullText.trim()) {
             resolve(`PDF Content from ${file.name}:\n\n${fullText.trim()}`);
           } else {
+            console.warn('No text extracted from PDF');
             resolve(`PDF file: ${file.name} (${Math.round(file.size / 1024)} KB)\n\nNote: This PDF appears to be image-based or contains no extractable text. Consider using an OCR tool to convert images to text.`);
           }
-        } catch (error) {
+        } catch (error: any) {
           console.error('Error extracting PDF text:', error);
-          resolve(`PDF file: ${file.name} (${Math.round(file.size / 1024)} KB)\n\nNote: Failed to extract text from this PDF. The file may be corrupted or password-protected.`);
+          
+          let errorMessage = `PDF file: ${file.name} (${Math.round(file.size / 1024)} KB)\n\n`;
+          
+          if (error.name === 'PasswordException') {
+            errorMessage += 'Note: This PDF is password-protected. Please remove the password and try again.';
+          } else if (error.name === 'InvalidPDFException') {
+            errorMessage += 'Note: This PDF appears to be corrupted or invalid. Please try with a different PDF file.';
+          } else if (error.message?.includes('worker')) {
+            errorMessage += 'Note: PDF processing worker failed to load. Please refresh the page and try again.';
+          } else if (error.message?.includes('fetch')) {
+            errorMessage += 'Note: Failed to load PDF processing resources. Please check your internet connection and try again.';
+          } else {
+            errorMessage += `Note: Failed to extract text from this PDF. Error: ${error.message || 'Unknown error occurred'}`;
+          }
+          
+          resolve(errorMessage);
         }
       };
-      reader.onerror = (e) => reject(e);
+      reader.onerror = (e) => {
+        console.error('FileReader error:', e);
+        reject(e);
+      };
       reader.readAsArrayBuffer(file);
     });
   }
