@@ -36,7 +36,7 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({
       'image/*': ['.png', '.jpg', '.jpeg', '.gif', '.webp']
     },
     multiple: true,
-    maxSize: 20 * 1024 * 1024, // 20MB
+    maxSize: 25 * 1024 * 1024, // 25MB
   });
 
   return (

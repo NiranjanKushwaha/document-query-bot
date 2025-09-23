@@ -46,7 +46,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
-      <div className="p-4 border-b bg-gradient-card">
+      <div className="p-4 border-b bg-gradient-card flex-shrink-0">
         <div className="flex items-center space-x-3">
           <div className="w-10 h-10 bg-gradient-primary rounded-full flex items-center justify-center">
             <Bot className="w-6 h-6 text-white" />
@@ -61,7 +61,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
       </div>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+      <div className="flex-1 overflow-y-auto p-4 space-y-4 min-h-0">
         {messages.length === 0 ? (
           <div className="text-center py-8">
             <div className="w-16 h-16 mx-auto mb-4 bg-gradient-ai rounded-full flex items-center justify-center">
@@ -144,7 +144,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
       </div>
 
       {/* Input */}
-      <div className="p-4 border-t bg-gradient-card">
+      <div className="p-4 border-t bg-gradient-card flex-shrink-0">
         <form onSubmit={handleSubmit} className="flex space-x-2">
           <Input
             ref={inputRef}
