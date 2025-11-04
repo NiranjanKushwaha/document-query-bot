@@ -4,11 +4,26 @@ import { Document } from '@/types/document';
 class GeminiService {
   private genAI: GoogleGenerativeAI | null = null;
   private model: any = null; // eslint-disable-line @typescript-eslint/no-explicit-any
+  private modelName: string = 'gemini-2.0-flash-exp'; // Default model that works with v1beta
 
   initialize(apiKey: string) {
     try {
       this.genAI = new GoogleGenerativeAI(apiKey);
-      this.model = this.genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+      
+      // Use gemini-2.0-flash-exp as default since it works with v1beta API
+      // This model is fast, efficient, and supports multimodal (images + text)
+      this.model = this.genAI.getGenerativeModel({ 
+        model: 'gemini-2.0-flash-exp',
+        generationConfig: {
+          temperature: 0.7,
+          topK: 40,
+          topP: 0.95,
+          maxOutputTokens: 8192, // Good balance for document queries
+        }
+      });
+      this.modelName = 'gemini-2.0-flash-exp';
+      console.log(`Initialized Gemini service with model: ${this.modelName}`);
+      
       return true;
     } catch (error) {
       console.error('Failed to initialize Gemini:', error);
@@ -111,10 +126,9 @@ class GeminiService {
       };
     });
 
+    // Concise context info for token efficiency
     const contextInfo = documentAnalysis.length > 0 ? 
-      `\n\nDOCUMENT CONTEXT: The user is asking about ${documentAnalysis.map(d => `${d.name} (${d.context})`).join(', ')}. ` +
-      `Please analyze the document content and filename to understand the context and interpret the question intelligently. ` +
-      `Be smart about understanding what the user is really asking for based on the document type and content.` : '';
+      `\nContext: ${documentAnalysis.map(d => `${d.name} (${d.context})`).join(', ')}. Interpret question based on document type.` : '';
 
     return query + contextInfo;
   }
@@ -124,52 +138,26 @@ class GeminiService {
       throw new Error('Gemini service not initialized. Please provide a valid API key.');
     }
 
+    // Preprocess the query to add context
+    const enhancedQuery = this.preprocessQuery(query, documents);
+    // Prepare content for multimodal processing - defined outside try for retry logic
+    const contentParts: any[] = []; // eslint-disable-line @typescript-eslint/no-explicit-any
+
     try {
-      // Preprocess the query to add context
-      const enhancedQuery = this.preprocessQuery(query, documents);
-      // Prepare content for multimodal processing
-      const contentParts: any[] = []; // eslint-disable-line @typescript-eslint/no-explicit-any
       
-      // Add text prompt
-      const textPrompt = `
-You are an intelligent document analysis AI assistant. You can ONLY answer questions about the uploaded documents provided to you.
+      // Add concise, token-efficient prompt
+      const textPrompt = `Analyze the uploaded documents and answer ONLY based on their content.
 
-IMPORTANT RULES:
-1. You MUST only answer questions related to the content of the uploaded documents
-2. If the user asks about anything NOT in the documents (math, coding, general knowledge, etc.), respond with: "I can only answer questions about the uploaded documents. Please ask me something about the content of your documents."
-3. Be intelligent and understand context by analyzing:
-   - Document filenames for context clues (resume, report, invoice, contract, etc.)
-   - Document content structure and type
-   - User's intent behind their question
-4. Use semantic understanding - understand synonyms and related terms:
-   - "experience" = work experience, professional experience, job experience, career history, background
-   - "skills" = technical skills, abilities, competencies, expertise, capabilities
-   - "education" = academic background, qualifications, degrees, certifications, training
-   - "summary" = overview, brief, key points, highlights, main points
-   - "data" = information, numbers, statistics, figures, results
-   - "details" = specific information, particulars, specifics
-5. If the answer cannot be found in the provided documents after considering synonyms and context, say "I cannot find this information in the provided documents."
-6. Always base your answers strictly on the document content provided
-7. Be helpful and interpret questions intelligently rather than literally
-8. Analyze the document type and content to understand what kind of information it contains
-9. If some documents cannot be processed (image-based PDFs, etc.), clearly explain which documents you can analyze and which you cannot, and suggest solutions
+Rules:
+- Answer ONLY questions about the documents. If asked about general knowledge, say: "I can only answer questions about the uploaded documents."
+- Understand context from filenames and content type (medical, financial, legal, etc.)
+- Use synonyms: "summary"="overview/key points", "details"="specifics", "experience"="work history", "data"="numbers/figures"
+- If information isn't found, say: "I cannot find this information in the provided documents."
+- Interpret questions intelligently based on document type
 
-INTELLIGENT INTERPRETATION GUIDELINES:
-- Analyze the document filename and content to understand its purpose
-- Medical documents: "details" = patient info, diagnosis, treatment; "summary" = discharge summary
-- Financial documents: "data" = amounts, transactions, balances; "summary" = financial overview
-- Legal documents: "details" = terms, conditions, clauses; "summary" = key legal points
-- KYC documents: "details" = personal information, identity proof; "summary" = verification status
-- Business documents: "experience" = work history; "summary" = professional overview
-- Technical documents: "details" = specifications, requirements; "summary" = technical overview
-- Research documents: "findings" = research results; "summary" = key conclusions
-- Government documents: "details" = official information; "summary" = key requirements
-- Always consider the document context when interpreting questions
+Question: ${enhancedQuery}
 
-User's question: ${enhancedQuery}
-
-Please provide a clear and accurate answer based ONLY on the document content. If you reference specific documents, mention their names. Consider the context and use intelligent interpretation of the question.
-`;
+Provide a clear answer based ONLY on the document content. Mention document names when referencing them.`;
       
       contentParts.push({ text: textPrompt });
 
@@ -187,32 +175,19 @@ Please provide a clear and accurate answer based ONLY on the document content. I
           if (isImageBasedPDF) {
             nonProcessableDocuments.push(doc);
           } else if (doc.type.startsWith('image/')) {
-            // Handle image content
-            contentParts.push({
-              text: `\nDocument: ${doc.name}\n`
-            });
-            
-            // Extract base64 data from data URL
+            // Handle image content - optimized format
             const base64Data = doc.content.split(',')[1];
             
-            // Validate base64 data
             if (!base64Data || base64Data.trim() === '') {
               console.error('Empty base64 data for image:', doc.name);
-              // Skip this image and continue with text-only processing
-              contentParts.push({
-                text: `\n[Image: ${doc.name} - Failed to process image data]\n`
-              });
+              contentParts.push({ text: `\n[${doc.name} - Image processing failed]\n` });
             } else {
-              // Use the file's MIME type directly
-              let mimeType = doc.type;
+              const mimeType = doc.type.startsWith('image/') ? doc.type : 'image/png';
+              console.log('Processing image:', doc.name, 'MIME type:', mimeType);
               
-              // Ensure we have a valid image MIME type
-              if (!mimeType.startsWith('image/')) {
-                mimeType = 'image/png'; // Default fallback
-              }
-              
-              console.log('Processing image:', doc.name, 'MIME type:', mimeType, 'Data length:', base64Data.length);
-              
+              contentParts.push({
+                text: `\n[${doc.name}]\n`
+              });
               contentParts.push({
                 inlineData: {
                   mimeType: mimeType,
@@ -222,10 +197,10 @@ Please provide a clear and accurate answer based ONLY on the document content. I
               processableDocuments.push(doc);
             }
           } else if (isProcessable) {
-            // Handle text content
+            // Handle text content - optimized format for token efficiency
             console.log('Adding text content for:', doc.name, 'Content preview:', doc.content.substring(0, 200));
             contentParts.push({
-              text: `\nDocument: ${doc.name}\nContent: ${doc.content}\n\n---\n`
+              text: `\n[${doc.name}]\n${doc.content}\n`
             });
             processableDocuments.push(doc);
           } else {
@@ -234,10 +209,10 @@ Please provide a clear and accurate answer based ONLY on the document content. I
         }
       }
       
-      // Add information about non-processable documents
+      // Add concise info about non-processable documents
       if (nonProcessableDocuments.length > 0) {
         contentParts.push({
-          text: `\n\n📋 Document Status:\nI can analyze the following documents: ${processableDocuments.map(d => d.name).join(', ')}\n\nI cannot analyze these documents: ${nonProcessableDocuments.map(d => d.name).join(', ')} - they appear to be image-based or contain insufficient text content.\n\n`
+          text: `\nNote: Cannot analyze ${nonProcessableDocuments.map(d => d.name).join(', ')} - image-based or insufficient text.\n`
         });
       }
 
@@ -263,20 +238,173 @@ Please provide a clear and accurate answer based ONLY on the document content. I
       console.error('Gemini API Error:', error);
       
       const errorObj = error as Error;
-      if (errorObj.message?.includes('API_KEY')) {
-        throw new Error('Invalid API key. Please check your Gemini API key and try again.');
-      } else if (errorObj.message?.includes('QUOTA_EXCEEDED')) {
-        throw new Error('API quota exceeded. Please check your Gemini API usage limits.');
-      } else if (errorObj.message?.includes('RATE_LIMIT')) {
+      const errorMessage = errorObj.message || '';
+      
+      // Handle 404 errors - model not found
+      if (errorMessage.includes('404') || errorMessage.includes('not found') || errorMessage.includes('is not found')) {
+        // Check if we need multimodal support (images)
+        const hasImages = documents.some(doc => doc.type.startsWith('image/'));
+        
+        // Try alternative models in order of preference
+        // Models that work with v1beta API version
+        const fallbackModels = [
+          'gemini-1.5-flash',      // Fast model (fallback)
+          'gemini-1.5-pro',        // Capable model (fallback)
+          'gemini-pro'             // Legacy model (may not work with v1beta)
+        ];
+        
+        if (this.genAI) {
+          for (const fallbackModel of fallbackModels) {
+            // Skip if we're already using this model
+            if (fallbackModel === this.modelName) {
+              continue;
+            }
+            
+            console.log(`Model ${this.modelName} not available, trying ${fallbackModel}...`);
+            try {
+              this.model = this.genAI.getGenerativeModel({ 
+                model: fallbackModel,
+                generationConfig: {
+                  temperature: 0.7,
+                  topK: 40,
+                  topP: 0.95,
+                  maxOutputTokens: 8192,
+                }
+              });
+              this.modelName = fallbackModel;
+              
+              // Retry the request with the new model
+              const result = await this.model.generateContent(contentParts);
+              const response = await result.response;
+              const answer = response.text();
+
+              const sources = documents
+                .filter(doc => answer.toLowerCase().includes(doc.name.toLowerCase()))
+                .map(doc => doc.name);
+
+              console.log(`Successfully used model: ${fallbackModel}`);
+              return {
+                answer: answer || 'I apologize, but I could not generate a response. Please try rephrasing your question.',
+                sources: sources.length > 0 ? sources : documents.map(doc => doc.name)
+              };
+            } catch (retryError) {
+              const retryErrorMsg = (retryError as Error).message || '';
+              console.warn(`Model ${fallbackModel} also failed:`, retryErrorMsg);
+              // Continue to next model
+              continue;
+            }
+          }
+        }
+        
+        // If all predefined models failed, try to discover a working model
+        console.log('All predefined models failed, attempting model discovery...');
+        const workingModel = await this.discoverWorkingModel();
+        
+        if (workingModel && this.genAI) {
+          console.log(`Found working model: ${workingModel}, retrying query...`);
+          try {
+            this.model = this.genAI.getGenerativeModel({ 
+              model: workingModel,
+              generationConfig: {
+                temperature: 0.7,
+                topK: 40,
+                topP: 0.95,
+                maxOutputTokens: 8192,
+              }
+            });
+            this.modelName = workingModel;
+            
+            // Retry the request with the discovered model
+            const result = await this.model.generateContent(contentParts);
+            const response = await result.response;
+            const answer = response.text();
+
+            const sources = documents
+              .filter(doc => answer.toLowerCase().includes(doc.name.toLowerCase()))
+              .map(doc => doc.name);
+
+            console.log(`Successfully used discovered model: ${workingModel}`);
+            return {
+              answer: answer || 'I apologize, but I could not generate a response. Please try rephrasing your question.',
+              sources: sources.length > 0 ? sources : documents.map(doc => doc.name)
+            };
+          } catch (discoveryError) {
+            console.error('Even discovered model failed:', discoveryError);
+          }
+        }
+        
+        // If all models failed including discovery
+        console.error('All model fallbacks and discovery failed. Original error:', errorMessage);
+        throw new Error(`Unable to access any Gemini models. Please verify:\n1. Your API key is valid and has model access\n2. Your API key has not been revoked\n3. Check https://makersuite.google.com/app/apikey for API key status\n4. Try updating @google/generative-ai package: npm install @google/generative-ai@latest\n\nOriginal error: ${errorMessage}`);
+      } else if (errorMessage.includes('API_KEY') || errorMessage.includes('401') || errorMessage.includes('403') || errorMessage.includes('permission') || errorMessage.includes('unauthorized')) {
+        throw new Error('Invalid API key or insufficient permissions. Please:\n1. Verify your API key at https://makersuite.google.com/app/apikey\n2. Ensure the API key is enabled for Generative AI\n3. Check that your API key has not been revoked or expired');
+      } else if (errorMessage.includes('QUOTA_EXCEEDED') || errorMessage.includes('quota')) {
+        throw new Error('API quota exceeded. Please check your Gemini API usage limits at https://makersuite.google.com/app/apikey');
+      } else if (errorMessage.includes('RATE_LIMIT') || errorMessage.includes('rate limit')) {
         throw new Error('Rate limit exceeded. Please wait a moment and try again.');
       } else {
-        throw new Error(`Failed to process your query: ${errorObj.message || 'Unknown error occurred'}`);
+        // For any other error, provide detailed information
+        throw new Error(`Failed to process your query: ${errorMessage}\n\nIf this persists, please:\n1. Check your API key is valid\n2. Verify you have access to Gemini models\n3. Check https://makersuite.google.com/app/apikey for API key status`);
       }
     }
   }
 
   isInitialized(): boolean {
     return this.model !== null;
+  }
+
+  // Test if the API key and model are working
+  async testConnection(): Promise<{ success: boolean; model?: string; error?: string }> {
+    if (!this.model || !this.genAI) {
+      return { success: false, error: 'Service not initialized' };
+    }
+
+    try {
+      // Try a simple test query
+      const testResult = await this.model.generateContent('Say "test" if you can hear me.');
+      const response = await testResult.response;
+      const text = response.text();
+      
+      if (text && text.length > 0) {
+        return { success: true, model: this.modelName };
+      } else {
+        return { success: false, error: 'Empty response from model' };
+      }
+    } catch (error: unknown) {
+      const errorObj = error as Error;
+      return { success: false, error: errorObj.message || 'Unknown error' };
+    }
+  }
+
+  // Try to find a working model by testing multiple options
+  async discoverWorkingModel(): Promise<string | null> {
+    if (!this.genAI) {
+      return null;
+    }
+
+    // List of models to try, ordered by likelihood of working with v1beta
+    const modelsToTry = [
+      'gemini-2.0-flash-exp',  // This is what actually works
+      'gemini-1.5-flash', 
+      'gemini-1.5-pro',
+      'gemini-pro'
+    ];
+
+    for (const modelName of modelsToTry) {
+      try {
+        console.log(`Testing model: ${modelName}...`);
+        const testModel = this.genAI.getGenerativeModel({ model: modelName });
+        // Try a minimal test
+        await testModel.generateContent('test');
+        console.log(`✓ Model ${modelName} works!`);
+        return modelName;
+      } catch (error) {
+        console.log(`✗ Model ${modelName} failed:`, (error as Error).message);
+        continue;
+      }
+    }
+
+    return null;
   }
 }
 
