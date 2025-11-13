@@ -8,11 +8,13 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 
 interface ApiKeyDialogProps {
   open: boolean;
+  onOpenChange: (open: boolean) => void;
   onApiKeySubmit: (apiKey: string) => void;
 }
 
 export const ApiKeyDialog: React.FC<ApiKeyDialogProps> = ({
   open,
+  onOpenChange,
   onApiKeySubmit,
 }) => {
   const [apiKey, setApiKey] = useState('');
@@ -26,22 +28,27 @@ export const ApiKeyDialog: React.FC<ApiKeyDialogProps> = ({
     }
   };
 
+  const handleCancel = () => {
+    onOpenChange(false);
+    setApiKey('');
+  };
+
   return (
-    <Dialog open={open}>
-      <DialogContent className="sm:max-w-md">
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="w-[95vw] sm:max-w-md p-4 sm:p-6">
         <DialogHeader>
-          <DialogTitle className="flex items-center space-x-2">
-            <Key className="w-5 h-5 text-ai-primary" />
+          <DialogTitle className="flex items-center space-x-2 text-base sm:text-lg">
+            <Key className="w-4 h-4 sm:w-5 sm:h-5 text-ai-primary flex-shrink-0" />
             <span>Configure Gemini API</span>
           </DialogTitle>
-          <DialogDescription>
+          <DialogDescription className="text-xs sm:text-sm">
             Enter your Google Gemini API key to enable AI document querying.
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-3 sm:space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="apiKey">Gemini API Key</Label>
+            <Label htmlFor="apiKey" className="text-sm">Gemini API Key</Label>
             <div className="relative">
               <Input
                 id="apiKey"
@@ -49,14 +56,14 @@ export const ApiKeyDialog: React.FC<ApiKeyDialogProps> = ({
                 value={apiKey}
                 onChange={(e) => setApiKey(e.target.value)}
                 placeholder="AIzaSy..."
-                className="pr-10"
+                className="pr-10 text-sm sm:text-base"
                 required
               />
               <Button
                 type="button"
                 variant="ghost"
                 size="sm"
-                className="absolute right-0 top-0 h-full px-3"
+                className="absolute right-0 top-0 h-full px-2 sm:px-3"
                 onClick={() => setShowKey(!showKey)}
               >
                 {showKey ? (
@@ -69,7 +76,7 @@ export const ApiKeyDialog: React.FC<ApiKeyDialogProps> = ({
           </div>
 
           <Alert className="bg-gradient-ai border-ai-primary/20">
-            <AlertDescription className="text-sm">
+            <AlertDescription className="text-xs sm:text-sm">
               <div className="space-y-2">
                 <p>
                   Don't have an API key? Get one from Google AI Studio:
@@ -78,23 +85,32 @@ export const ApiKeyDialog: React.FC<ApiKeyDialogProps> = ({
                   type="button"
                   variant="outline"
                   size="sm"
-                  className="w-full"
+                  className="w-full text-xs sm:text-sm"
                   onClick={() => window.open('https://makersuite.google.com/app/apikey', '_blank')}
                 >
-                  <ExternalLink className="w-4 h-4 mr-2" />
-                  Get Gemini API Key
+                  <ExternalLink className="w-3 h-3 sm:w-4 sm:h-4 sm:mr-2" />
+                  <span className="hidden sm:inline">Get Gemini API Key</span>
+                  <span className="sm:hidden">Get API Key</span>
                 </Button>
-                <p className="text-xs text-muted-foreground">
+                <p className="text-[10px] sm:text-xs text-muted-foreground">
                   Your API key is stored locally in your browser and never sent to our servers.
                 </p>
               </div>
             </AlertDescription>
           </Alert>
 
-          <div className="flex justify-end space-x-2">
+          <div className="flex flex-col-reverse sm:flex-row justify-end gap-2 sm:space-x-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handleCancel}
+              className="w-full sm:w-auto text-sm"
+            >
+              Cancel
+            </Button>
             <Button
               type="submit"
-              className="bg-gradient-primary hover:bg-primary-hover"
+              className="bg-gradient-primary hover:bg-primary-hover w-full sm:w-auto text-sm"
               disabled={!apiKey.trim()}
             >
               Save API Key
