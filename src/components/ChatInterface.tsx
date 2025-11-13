@@ -113,17 +113,17 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
   };
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full min-h-0">
       {/* Header */}
-      <div className="p-4 border-b bg-gradient-card flex-shrink-0">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 bg-gradient-primary rounded-full flex items-center justify-center">
-              <Bot className="w-6 h-6 text-white" />
+      <div className="p-3 sm:p-4 border-b bg-gradient-card flex-shrink-0">
+        <div className="flex items-center justify-between gap-2 sm:gap-4">
+          <div className="flex items-center space-x-2 sm:space-x-3 min-w-0 flex-1">
+            <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gradient-primary rounded-full flex items-center justify-center flex-shrink-0">
+              <Bot className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
             </div>
-            <div>
-              <h2 className="text-lg font-semibold">AI Document Assistant</h2>
-              <p className="text-sm text-muted-foreground">
+            <div className="min-w-0 flex-1">
+              <h2 className="text-base sm:text-lg font-semibold truncate">AI Document Assistant</h2>
+              <p className="text-xs sm:text-sm text-muted-foreground truncate">
                 Ask questions about your uploaded documents
               </p>
             </div>
@@ -137,7 +137,8 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
                     disabled={isExporting || isLoading || isOcrProcessing}
                     variant="outline"
                     size="sm"
-                    className="flex items-center space-x-2 hover:bg-gradient-primary hover:text-white transition-all duration-300"
+                    className="flex items-center space-x-1 sm:space-x-2 hover:bg-gradient-primary hover:text-white transition-all duration-300 p-2 sm:px-3 sm:py-2 flex-shrink-0"
+                    title="Export chat conversation as PDF"
                   >
                     {isExporting ? (
                       <Loader2 className="w-4 h-4 animate-spin" />
@@ -159,20 +160,20 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
       </div>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4 chat-messages-container" style={{ minHeight: 0, maxHeight: 'calc(100vh - 200px)' }}>
+      <div className="flex-1 overflow-y-auto p-3 sm:p-4 space-y-3 sm:space-y-4 chat-messages-container min-h-0">
         {messages.length === 0 ? (
-          <div className="text-center py-8">
-            <div className="w-16 h-16 mx-auto mb-4 bg-gradient-ai rounded-full flex items-center justify-center">
-              <Bot className="w-8 h-8 text-ai-primary" />
+          <div className="text-center py-6 sm:py-8 px-2">
+            <div className="w-12 h-12 sm:w-16 sm:h-16 mx-auto mb-3 sm:mb-4 bg-gradient-ai rounded-full flex items-center justify-center">
+              <Bot className="w-6 h-6 sm:w-8 sm:h-8 text-ai-primary" />
             </div>
-            <h3 className="text-lg font-medium mb-2">Ready to analyze your documents!</h3>
-            <p className="text-muted-foreground text-sm max-w-md mx-auto mb-4">
+            <h3 className="text-base sm:text-lg font-medium mb-2">Ready to analyze your documents!</h3>
+            <p className="text-muted-foreground text-xs sm:text-sm max-w-md mx-auto mb-3 sm:mb-4 px-2">
               Upload some documents and ask me questions about their content. 
               I can help you find information, summarize content, and answer specific queries about your uploaded files.
             </p>
-            <div className="text-xs text-muted-foreground max-w-md mx-auto">
+            <div className="text-xs text-muted-foreground max-w-md mx-auto px-2">
               <p className="font-medium mb-2">💡 Try asking:</p>
-              <ul className="text-left space-y-1">
+              <ul className="text-left space-y-1 inline-block">
                 <li>• "Give me a summary"</li>
                 <li>• "What are the key points?"</li>
                 <li>• "Show me the data"</li>
@@ -189,31 +190,31 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
               className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'}`}
             >
               <Card
-                className={`max-w-[80%] p-4 chat-message ${
+                className={`max-w-[85%] sm:max-w-[80%] p-3 sm:p-4 chat-message ${
                   message.type === 'user'
                     ? 'bg-gradient-primary text-white'
                     : 'bg-card border-muted'
                 }`}
               >
-                <div className="flex items-start space-x-3">
-                  <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
+                <div className="flex items-start space-x-2 sm:space-x-3">
+                  <div className={`w-6 h-6 sm:w-8 sm:h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
                     message.type === 'user'
                       ? 'bg-white/20'
                       : 'bg-gradient-primary'
                   }`}>
                     {message.type === 'user' ? (
-                      <User className="w-5 h-5" />
+                      <User className="w-3 h-3 sm:w-5 sm:h-5" />
                     ) : (
-                      <Bot className="w-5 h-5 text-white" />
+                      <Bot className="w-3 h-3 sm:w-5 sm:h-5 text-white" />
                     )}
                   </div>
                   <div className="min-w-0 flex-1">
-                    <p className={`text-sm whitespace-pre-wrap break-words overflow-wrap-anywhere ${
+                    <p className={`text-xs sm:text-sm whitespace-pre-wrap break-words overflow-wrap-anywhere ${
                       message.type === 'user' ? 'text-white' : 'text-foreground'
                     }`}>
                       {message.content}
                     </p>
-                    <p className={`text-xs mt-2 ${
+                    <p className={`text-[10px] sm:text-xs mt-1 sm:mt-2 ${
                       message.type === 'user' ? 'text-white/70' : 'text-muted-foreground'
                     }`}>
                       {message.timestamp.toLocaleTimeString()}
@@ -227,13 +228,13 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
 
         {(isLoading || isOcrProcessing) && (
           <div className="flex justify-start">
-            <Card className="max-w-[80%] p-4 bg-card border-muted chat-message">
-              <div className="flex items-center space-x-3">
-                <div className="w-8 h-8 bg-gradient-primary rounded-full flex items-center justify-center">
-                  <Loader2 className="w-5 h-5 text-white animate-spin" />
+            <Card className="max-w-[85%] sm:max-w-[80%] p-3 sm:p-4 bg-card border-muted chat-message">
+              <div className="flex items-center space-x-2 sm:space-x-3">
+                <div className="w-6 h-6 sm:w-8 sm:h-8 bg-gradient-primary rounded-full flex items-center justify-center flex-shrink-0">
+                  <Loader2 className="w-3 h-3 sm:w-5 sm:h-5 text-white animate-spin" />
                 </div>
-                <div className="flex-1">
-                  <div className="text-sm text-muted-foreground mb-2">
+                <div className="flex-1 min-w-0">
+                  <div className="text-xs sm:text-sm text-muted-foreground mb-2 break-words">
                     {isOcrProcessing ? 'Processing image-based PDF with OCR...' : 'Processing your question...'}
                   </div>
                   {isOcrProcessing && (
@@ -253,7 +254,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
         {error && (
           <Alert className="border-ai-error bg-ai-error/5">
             <AlertCircle className="h-4 w-4 text-ai-error flex-shrink-0" />
-            <AlertDescription className="text-ai-error break-words overflow-wrap-anywhere">
+            <AlertDescription className="text-ai-error break-words overflow-wrap-anywhere text-xs sm:text-sm">
               {error}
             </AlertDescription>
           </Alert>
@@ -263,26 +264,27 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
       </div>
 
       {/* Input */}
-      <div className="p-4 border-t bg-gradient-card flex-shrink-0">
+      <div className="p-3 sm:p-4 border-t bg-gradient-card flex-shrink-0">
         <form onSubmit={handleSubmit} className="flex space-x-2">
           <Input
             ref={inputRef}
             value={inputMessage}
             onChange={(e) => setInputMessage(e.target.value)}
             onKeyPress={handleKeyPress}
-            placeholder="Ask about your uploaded documents (e.g., 'Give me a summary', 'What are the key points?')"
+            placeholder="Ask about your documents..."
             disabled={isLoading}
-            className="flex-1"
+            className="flex-1 text-sm sm:text-base"
           />
           <Button
             type="submit"
             disabled={!inputMessage.trim() || isLoading}
-            className="bg-gradient-primary hover:bg-primary-hover transition-all duration-300"
+            className="bg-gradient-primary hover:bg-primary-hover transition-all duration-300 flex-shrink-0"
+            size="sm"
           >
             <Send className="w-4 h-4" />
           </Button>
         </form>
-        <p className="text-xs text-muted-foreground mt-2">
+        <p className="text-[10px] sm:text-xs text-muted-foreground mt-1 sm:mt-2">
           Press Enter to send, Shift+Enter for new line. I can only answer questions about your uploaded documents.
         </p>
       </div>

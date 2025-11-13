@@ -71,11 +71,11 @@ export const DocumentPreview: React.FC<DocumentPreviewProps> = ({
   const renderPreview = () => {
     if (isImage && !imageError) {
       return (
-        <div className="flex items-center justify-center p-4 bg-muted/30 rounded-lg">
+        <div className="flex items-center justify-center p-2 sm:p-4 bg-muted/30 rounded-lg">
           <img
             src={URL.createObjectURL(document.file)}
             alt={document.name}
-            className="max-w-full max-h-96 object-contain rounded-lg shadow-custom-md"
+            className="max-w-full max-h-[50vh] sm:max-h-96 object-contain rounded-lg shadow-custom-md"
             onError={() => setImageError(true)}
           />
         </div>
@@ -85,23 +85,24 @@ export const DocumentPreview: React.FC<DocumentPreviewProps> = ({
     if (isPDF && pdfUrl && !pdfError) {
       return (
         <div className="bg-muted/30 rounded-lg overflow-hidden">
-          <div className="flex items-center justify-between p-3 bg-muted/50 border-b">
-            <span className="text-sm font-medium">PDF Preview</span>
-            <div className="flex items-center space-x-2">
+          <div className="flex items-center justify-between p-2 sm:p-3 bg-muted/50 border-b gap-2">
+            <span className="text-xs sm:text-sm font-medium">PDF Preview</span>
+            <div className="flex items-center space-x-2 flex-shrink-0">
               <Button
                 variant="outline"
                 size="sm"
                 onClick={() => window.open(pdfUrl, '_blank')}
-                className="text-xs"
+                className="text-[10px] sm:text-xs p-1 sm:px-2 sm:py-1"
               >
-                Open in New Tab
+                <span className="hidden sm:inline">Open in New Tab</span>
+                <span className="sm:hidden">Open</span>
               </Button>
             </div>
           </div>
           <div className="relative">
             <iframe
               src={pdfUrl}
-              className="w-full h-96 border-0"
+              className="w-full h-[50vh] sm:h-96 border-0"
               title={`Preview of ${document.name}`}
               onError={() => setPdfError(true)}
             />
@@ -112,8 +113,8 @@ export const DocumentPreview: React.FC<DocumentPreviewProps> = ({
 
     if (isText && document.content) {
       return (
-        <div className="bg-muted/30 rounded-lg p-4">
-          <pre className="whitespace-pre-wrap text-sm font-mono text-foreground max-h-96 overflow-y-auto">
+        <div className="bg-muted/30 rounded-lg p-2 sm:p-4">
+          <pre className="whitespace-pre-wrap text-xs sm:text-sm font-mono text-foreground max-h-[50vh] sm:max-h-96 overflow-y-auto">
             {document.content}
           </pre>
         </div>
@@ -122,34 +123,36 @@ export const DocumentPreview: React.FC<DocumentPreviewProps> = ({
 
     // Fallback for other file types or PDF error
     return (
-      <Card className="p-8 text-center bg-gradient-ai">
-        <div className="space-y-4">
-          <div className="w-16 h-16 mx-auto bg-gradient-primary rounded-full flex items-center justify-center">
+      <Card className="p-4 sm:p-6 md:p-8 text-center bg-gradient-ai">
+        <div className="space-y-3 sm:space-y-4">
+          <div className="w-12 h-12 sm:w-16 sm:h-16 mx-auto bg-gradient-primary rounded-full flex items-center justify-center">
             {isPDF ? (
-              <FileText className="w-8 h-8 text-white" />
+              <FileText className="w-6 h-6 sm:w-8 sm:h-8 text-white" />
             ) : (
-              <File className="w-8 h-8 text-white" />
+              <File className="w-6 h-6 sm:w-8 sm:h-8 text-white" />
             )}
           </div>
           <div>
-            <h3 className="text-lg font-semibold mb-2">{document.name}</h3>
-            <p className="text-muted-foreground text-sm mb-4">
+            <h3 className="text-sm sm:text-base md:text-lg font-semibold mb-1 sm:mb-2 break-words">{document.name}</h3>
+            <p className="text-muted-foreground text-xs sm:text-sm mb-3 sm:mb-4">
               {isPDF 
                 ? (pdfError ? 'PDF could not be displayed' : 'PDF Document') 
                 : 'Binary File'
               } • {(document.size / 1024).toFixed(1)} KB
             </p>
             {isPDF && pdfError && (
-              <p className="text-sm text-muted-foreground mb-4">
+              <p className="text-xs sm:text-sm text-muted-foreground mb-3 sm:mb-4 px-2">
                 This PDF cannot be previewed in the browser. You can download it to view with your preferred PDF reader.
               </p>
             )}
             <Button
               onClick={handleDownload}
-              className="bg-gradient-primary hover:bg-primary-hover"
+              className="bg-gradient-primary hover:bg-primary-hover text-xs sm:text-sm"
+              size="sm"
             >
-              <Download className="w-4 h-4 mr-2" />
-              Download File
+              <Download className="w-4 h-4 sm:mr-2" />
+              <span className="hidden sm:inline">Download File</span>
+              <span className="sm:hidden">Download</span>
             </Button>
           </div>
         </div>
@@ -159,32 +162,33 @@ export const DocumentPreview: React.FC<DocumentPreviewProps> = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={() => onClose()}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-[95vw] sm:max-w-2xl md:max-w-4xl max-h-[90vh] overflow-y-auto p-4 sm:p-6">
         <DialogHeader>
-          <DialogTitle className="flex items-center justify-between">
-            <div className="flex items-center space-x-2">
-              <Eye className="w-5 h-5 text-ai-primary" />
-              <span>Preview: {document.name}</span>
+          <DialogTitle className="flex items-center justify-between gap-2 sm:gap-4">
+            <div className="flex items-center space-x-2 min-w-0 flex-1">
+              <Eye className="w-4 h-4 sm:w-5 sm:h-5 text-ai-primary flex-shrink-0" />
+              <span className="truncate text-sm sm:text-base">Preview: {document.name}</span>
             </div>
-            <div className="flex items-center space-x-2">
+            <div className="flex items-center space-x-2 flex-shrink-0">
               <Button
                 variant="outline"
                 size="sm"
                 onClick={handleDownload}
+                className="p-2 sm:px-3 sm:py-2"
               >
-                <Download className="w-4 h-4 mr-2" />
-                Download
+                <Download className="w-4 h-4 sm:mr-2" />
+                <span className="hidden sm:inline">Download</span>
               </Button>
             </div>
           </DialogTitle>
         </DialogHeader>
 
-        <div className="mt-4">
+        <div className="mt-3 sm:mt-4">
           {renderPreview()}
         </div>
 
-        <div className="mt-4 pt-4 border-t">
-          <div className="text-sm text-muted-foreground space-y-1">
+        <div className="mt-3 sm:mt-4 pt-3 sm:pt-4 border-t">
+          <div className="text-xs sm:text-sm text-muted-foreground space-y-1">
             <p><strong>File Size:</strong> {(document.size / 1024).toFixed(1)} KB</p>
             <p><strong>Type:</strong> {document.type || 'Unknown'}</p>
             <p><strong>Uploaded:</strong> {document.uploadedAt.toLocaleString()}</p>

@@ -172,4 +172,42 @@
   .chat-messages-container::-webkit-scrollbar-thumb:hover {
     background: #94a3b8;
   }
+
+  /* Responsive improvements */
+  @media (max-width: 640px) {
+    /* Improve text readability on small screens */
+    body {
+      -webkit-text-size-adjust: 100%;
+      -moz-text-size-adjust: 100%;
+      text-size-adjust: 100%;
+    }
+
+    /* Prevent horizontal scrolling on images and media */
+    img, video, iframe {
+      max-width: 100%;
+      height: auto;
+    }
+  }
+
+  /* Improve dialog responsiveness */
+  @media (max-width: 640px) {
+    [role="dialog"] {
+      margin: 1rem;
+      max-width: calc(100vw - 2rem);
+    }
+  }
+
+  /* Better spacing on mobile */
+  @media (max-width: 768px) {
+    .space-y-4 > * + * {
+      margin-top: 0.75rem;
+    }
+  }
+
+  /* Ensure proper viewport handling */
+  @media (max-width: 1024px) {
+    html {
+      overflow-x: hidden;
+    }
+  }
 }

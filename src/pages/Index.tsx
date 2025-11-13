@@ -197,40 +197,42 @@ const Index = () => {
     <div className="h-screen bg-gradient-secondary flex flex-col overflow-hidden">
       {/* Header */}
       <header className="bg-gradient-card border-b shadow-custom-sm flex-shrink-0">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 bg-gradient-primary rounded-xl flex items-center justify-center">
-                <FileText className="w-6 h-6 text-white" />
+        <div className="max-w-7xl mx-auto px-3 sm:px-4 md:px-6 lg:px-8 py-3 sm:py-4">
+          <div className="flex items-center justify-between gap-2 sm:gap-4">
+            <div className="flex items-center space-x-2 sm:space-x-3 min-w-0 flex-1">
+              <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gradient-primary rounded-xl flex items-center justify-center flex-shrink-0">
+                <FileText className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
               </div>
-              <div>
-                <h1 className="text-2xl font-bold bg-gradient-primary bg-clip-text text-transparent">
+              <div className="min-w-0 flex-1">
+                <h1 className="text-lg sm:text-xl md:text-2xl font-bold bg-gradient-primary bg-clip-text text-transparent truncate">
                   DocQuery AI
                 </h1>
-                <p className="text-sm text-muted-foreground">
+                <p className="text-xs sm:text-sm text-muted-foreground truncate">
                   Intelligent document analysis powered by AI
                 </p>
               </div>
             </div>
-            <div className="flex items-center space-x-2">
+            <div className="flex items-center space-x-1 sm:space-x-2 flex-shrink-0">
               <Button
                 variant="outline"
                 size="sm"
                 onClick={() => setShowApiDialog(true)}
-                className="hidden sm:flex"
+                className="p-2 sm:px-3 sm:py-2"
+                title="API Settings"
               >
-                <Settings className="w-4 h-4 mr-2" />
-                API Settings
+                <Settings className="w-4 h-4 sm:mr-2" />
+                <span className="hidden sm:inline">API Settings</span>
               </Button>
               {documents.length > 0 && (
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={handleClearDocuments}
-                  className="hidden sm:flex hover:bg-destructive hover:text-destructive-foreground"
+                  className="p-2 sm:px-3 sm:py-2 hover:bg-destructive hover:text-destructive-foreground"
+                  title="Clear All"
                 >
-                  <Trash2 className="w-4 h-4 mr-2" />
-                  Clear All
+                  <Trash2 className="w-4 h-4 sm:mr-2" />
+                  <span className="hidden sm:inline">Clear All</span>
                 </Button>
               )}
             </div>
@@ -239,18 +241,18 @@ const Index = () => {
       </header>
 
       {/* Main Content */}
-      <main className="flex-1 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-full">
+      <main className="flex-1 max-w-7xl mx-auto px-3 sm:px-4 md:px-6 lg:px-8 py-4 sm:py-6 overflow-hidden">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6 h-full">
           {/* Document Panel */}
-          <div className="lg:col-span-1">
-            <Card className="h-full bg-gradient-card border-0 shadow-custom-md">
-              <div className="p-4 border-b">
+          <div className="lg:col-span-1 flex flex-col min-h-0">
+            <Card className="h-full bg-gradient-card border-0 shadow-custom-md flex flex-col min-h-0">
+              <div className="p-3 sm:p-4 border-b flex-shrink-0">
                 <div className="flex items-center space-x-2">
-                  <FileText className="w-5 h-5 text-ai-primary" />
-                  <h2 className="text-lg font-semibold">Documents</h2>
+                  <FileText className="w-5 h-5 text-ai-primary flex-shrink-0" />
+                  <h2 className="text-base sm:text-lg font-semibold">Documents</h2>
                 </div>
               </div>
-              <div className="p-4 h-[calc(100%-4rem)] overflow-y-auto" style={{ minHeight: '400px' }}>
+              <div className="p-3 sm:p-4 flex-1 overflow-y-auto min-h-0">
                 <DocumentUpload
                   onUpload={handleFileUpload}
                   documents={documents}
@@ -262,8 +264,8 @@ const Index = () => {
           </div>
 
           {/* Chat Panel */}
-          <div className="lg:col-span-2">
-            <Card className="h-full bg-gradient-card border-0 shadow-custom-md flex flex-col">
+          <div className="lg:col-span-2 flex flex-col min-h-0">
+            <Card className="h-full bg-gradient-card border-0 shadow-custom-md flex flex-col min-h-0">
               <ChatInterface
                 messages={messages}
                 onSendMessage={handleSendMessage}
