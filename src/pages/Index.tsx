@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useEffect } from 'react';
-import { FileText, MessageSquare, Settings, Trash2 } from 'lucide-react';
+import { FileText, MessageSquare, Settings, Trash2, Scan } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { Toaster } from '@/components/ui/toaster';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -11,9 +12,11 @@ import { DocumentPreview } from '@/components/DocumentPreview';
 import { Document, ChatMessage } from '@/types/document';
 import { DocumentService } from '@/services/documentService';
 import { geminiService } from '@/services/geminiService';
+import { ocrService } from '@/services/ocrService';
 
 const Index = () => {
   const { toast } = useToast();
+  const navigate = useNavigate();
   const [documents, setDocuments] = useState<Document[]>([]);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -141,13 +144,22 @@ const Index = () => {
 
   // Handle API key submission
   const handleApiKeySubmit = useCallback((apiKey: string) => {
-    const success = geminiService.initialize(apiKey);
-    if (success) {
+    // Reinitialize both services with the new API key
+    const geminiSuccess = geminiService.initialize(apiKey);
+    
+    // Also initialize OCR service
+    if (ocrService.reinitialize) {
+      ocrService.reinitialize(apiKey);
+    } else if (ocrService.initialize) {
+      ocrService.initialize(apiKey);
+    }
+    
+    if (geminiSuccess) {
       localStorage.setItem('gemini_api_key', apiKey);
       setShowApiDialog(false);
       toast({
-        title: "API Key Configured",
-        description: "You can now start asking questions about your documents",
+        title: "API Key Updated",
+        description: "API key has been updated. You can now use all features.",
       });
     } else {
       toast({
@@ -213,6 +225,16 @@ const Index = () => {
               </div>
             </div>
             <div className="flex items-center space-x-1 sm:space-x-2 flex-shrink-0">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => navigate('/ocr')}
+                className="p-2 sm:px-3 sm:py-2"
+                title="OCR Scanner"
+              >
+                <Scan className="w-4 h-4 sm:mr-2" />
+                <span className="hidden sm:inline">OCR Scanner</span>
+              </Button>
               <Button
                 variant="outline"
                 size="sm"

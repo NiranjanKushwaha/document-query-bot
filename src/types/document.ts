@@ -22,3 +22,12 @@ export interface AIResponse {
   sources?: string[];
   confidence?: number;
 }
+
+export interface OCRResult {
+  documentName: string;
+  documentType: string;
+  extractedData: Record<string, unknown>;
+  rawText?: string;
+  confidence?: number;
+  processingTime?: number;
+}

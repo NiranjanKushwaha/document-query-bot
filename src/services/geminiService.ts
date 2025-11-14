@@ -22,7 +22,13 @@ class GeminiService {
         }
       });
       this.modelName = 'gemini-2.0-flash-exp';
-      console.log(`Initialized Gemini service with model: ${this.modelName}`);
+      
+      // Log API key info for debugging (masked)
+      const apiKeyPrefix = apiKey.substring(0, 8);
+      const apiKeySuffix = apiKey.substring(apiKey.length - 4);
+      console.log(`✓ Initialized Gemini service with model: ${this.modelName}`);
+      console.log(`✓ Using API key: ${apiKeyPrefix}...${apiKeySuffix}`);
+      console.log(`💡 API calls will be logged in Google AI Studio (may take a few minutes to appear)`);
       
       return true;
     } catch (error) {
@@ -137,6 +143,11 @@ class GeminiService {
     if (!this.model) {
       throw new Error('Gemini service not initialized. Please provide a valid API key.');
     }
+
+    // Log API call for debugging
+    const currentApiKey = typeof window !== 'undefined' ? localStorage.getItem('gemini_api_key') : null;
+    const apiKeyPrefix = currentApiKey ? currentApiKey.substring(0, 8) : 'unknown';
+    console.log(`📤 Making API call with key: ${apiKeyPrefix}... (this will appear in Google AI Studio logs)`);
 
     // Preprocess the query to add context
     const enhancedQuery = this.preprocessQuery(query, documents);
@@ -338,8 +349,11 @@ Provide a clear answer based ONLY on the document content. Mention document name
         throw new Error(`Unable to access any Gemini models. Please verify:\n1. Your API key is valid and has model access\n2. Your API key has not been revoked\n3. Check https://makersuite.google.com/app/apikey for API key status\n4. Try updating @google/generative-ai package: npm install @google/generative-ai@latest\n\nOriginal error: ${errorMessage}`);
       } else if (errorMessage.includes('API_KEY') || errorMessage.includes('401') || errorMessage.includes('403') || errorMessage.includes('permission') || errorMessage.includes('unauthorized')) {
         throw new Error('Invalid API key or insufficient permissions. Please:\n1. Verify your API key at https://makersuite.google.com/app/apikey\n2. Ensure the API key is enabled for Generative AI\n3. Check that your API key has not been revoked or expired');
-      } else if (errorMessage.includes('QUOTA_EXCEEDED') || errorMessage.includes('quota')) {
-        throw new Error('API quota exceeded. Please check your Gemini API usage limits at https://makersuite.google.com/app/apikey');
+      } else if (errorMessage.includes('QUOTA_EXCEEDED') || errorMessage.includes('quota') || errorMessage.includes('429') || errorMessage.includes('RESOURCE_EXHAUSTED')) {
+        // Get current API key prefix for debugging
+        const currentApiKey = typeof window !== 'undefined' ? localStorage.getItem('gemini_api_key') : null;
+        const apiKeyPrefix = currentApiKey ? currentApiKey.substring(0, 8) : 'unknown';
+        throw new Error(`API quota exceeded for key starting with "${apiKeyPrefix}...". Please check your Gemini API usage limits at https://makersuite.google.com/app/apikey. If you created a new API key, please refresh the page or update the API key in settings.`);
       } else if (errorMessage.includes('RATE_LIMIT') || errorMessage.includes('rate limit')) {
         throw new Error('Rate limit exceeded. Please wait a moment and try again.');
       } else {
