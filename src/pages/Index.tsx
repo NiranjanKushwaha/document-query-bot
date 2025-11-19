@@ -144,8 +144,14 @@ const Index = () => {
 
   // Handle API key submission
   const handleApiKeySubmit = useCallback((apiKey: string) => {
+    // Save to localStorage first to ensure it's available
+    localStorage.setItem('gemini_api_key', apiKey);
+    
     // Reinitialize both services with the new API key
-    const geminiSuccess = geminiService.initialize(apiKey);
+    // Use reinitialize if available to properly clear old instances
+    const geminiSuccess = geminiService.reinitialize 
+      ? geminiService.reinitialize(apiKey)
+      : geminiService.initialize(apiKey);
     
     // Also initialize OCR service
     if (ocrService.reinitialize) {
@@ -155,7 +161,6 @@ const Index = () => {
     }
     
     if (geminiSuccess) {
-      localStorage.setItem('gemini_api_key', apiKey);
       setShowApiDialog(false);
       toast({
         title: "API Key Updated",

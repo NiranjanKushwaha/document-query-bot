@@ -4,16 +4,18 @@ import { Document } from '@/types/document';
 class GeminiService {
   private genAI: GoogleGenerativeAI | null = null;
   private model: any = null; // eslint-disable-line @typescript-eslint/no-explicit-any
-  private modelName: string = 'gemini-2.0-flash-exp'; // Default model that works with v1beta
+  private modelName: string = 'gemini-1.5-flash'; // Default model - most stable and widely available
+  private currentApiKey: string | null = null; // Store current API key for error messages
 
   initialize(apiKey: string) {
     try {
       this.genAI = new GoogleGenerativeAI(apiKey);
+      this.currentApiKey = apiKey; // Store the current API key
       
-      // Use gemini-2.0-flash-exp as default since it works with v1beta API
-      // This model is fast, efficient, and supports multimodal (images + text)
+      // Use gemini-1.5-flash as default - most stable and widely available
+      // If this model isn't available, the fallback logic in queryDocuments will try others
       this.model = this.genAI.getGenerativeModel({ 
-        model: 'gemini-2.0-flash-exp',
+        model: 'gemini-1.5-flash',
         generationConfig: {
           temperature: 0.7,
           topK: 40,
@@ -21,7 +23,7 @@ class GeminiService {
           maxOutputTokens: 8192, // Good balance for document queries
         }
       });
-      this.modelName = 'gemini-2.0-flash-exp';
+      this.modelName = 'gemini-1.5-flash';
       
       // Log API key info for debugging (masked)
       const apiKeyPrefix = apiKey.substring(0, 8);
@@ -29,12 +31,27 @@ class GeminiService {
       console.log(`✓ Initialized Gemini service with model: ${this.modelName}`);
       console.log(`✓ Using API key: ${apiKeyPrefix}...${apiKeySuffix}`);
       console.log(`💡 API calls will be logged in Google AI Studio (may take a few minutes to appear)`);
+      console.log(`💡 If model errors occur, the service will automatically try fallback models`);
       
       return true;
     } catch (error) {
       console.error('Failed to initialize Gemini:', error);
       return false;
     }
+  }
+
+  // Reinitialize with a new API key (useful when API key is updated)
+  reinitialize(apiKey: string): boolean {
+    // Clear existing model and genAI to ensure clean reinitialization
+    if (this.model) {
+      this.model = null;
+    }
+    if (this.genAI) {
+      this.genAI = null;
+    }
+    this.currentApiKey = null;
+    // Initialize with new key
+    return this.initialize(apiKey);
   }
 
   private preprocessQuery(query: string, documents: Document[]): string {
@@ -144,9 +161,9 @@ class GeminiService {
       throw new Error('Gemini service not initialized. Please provide a valid API key.');
     }
 
-    // Log API call for debugging
-    const currentApiKey = typeof window !== 'undefined' ? localStorage.getItem('gemini_api_key') : null;
-    const apiKeyPrefix = currentApiKey ? currentApiKey.substring(0, 8) : 'unknown';
+    // Log API call for debugging - prefer service's stored key over localStorage
+    const apiKeyToUse = this.currentApiKey || (typeof window !== 'undefined' ? localStorage.getItem('gemini_api_key') : null);
+    const apiKeyPrefix = apiKeyToUse ? apiKeyToUse.substring(0, 8) : 'unknown';
     console.log(`📤 Making API call with key: ${apiKeyPrefix}... (this will appear in Google AI Studio logs)`);
 
     // Preprocess the query to add context
@@ -350,9 +367,9 @@ Provide a clear answer based ONLY on the document content. Mention document name
       } else if (errorMessage.includes('API_KEY') || errorMessage.includes('401') || errorMessage.includes('403') || errorMessage.includes('permission') || errorMessage.includes('unauthorized')) {
         throw new Error('Invalid API key or insufficient permissions. Please:\n1. Verify your API key at https://makersuite.google.com/app/apikey\n2. Ensure the API key is enabled for Generative AI\n3. Check that your API key has not been revoked or expired');
       } else if (errorMessage.includes('QUOTA_EXCEEDED') || errorMessage.includes('quota') || errorMessage.includes('429') || errorMessage.includes('RESOURCE_EXHAUSTED')) {
-        // Get current API key prefix for debugging
-        const currentApiKey = typeof window !== 'undefined' ? localStorage.getItem('gemini_api_key') : null;
-        const apiKeyPrefix = currentApiKey ? currentApiKey.substring(0, 8) : 'unknown';
+        // Get current API key prefix for debugging - prefer service's stored key over localStorage
+        const apiKeyToUse = this.currentApiKey || (typeof window !== 'undefined' ? localStorage.getItem('gemini_api_key') : null);
+        const apiKeyPrefix = apiKeyToUse ? apiKeyToUse.substring(0, 8) : 'unknown';
         throw new Error(`API quota exceeded for key starting with "${apiKeyPrefix}...". Please check your Gemini API usage limits at https://makersuite.google.com/app/apikey. If you created a new API key, please refresh the page or update the API key in settings.`);
       } else if (errorMessage.includes('RATE_LIMIT') || errorMessage.includes('rate limit')) {
         throw new Error('Rate limit exceeded. Please wait a moment and try again.');

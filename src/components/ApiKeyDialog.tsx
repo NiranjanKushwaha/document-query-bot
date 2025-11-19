@@ -63,41 +63,88 @@ export const ApiKeyDialog: React.FC<ApiKeyDialogProps> = ({
     try {
       // Create a temporary service instance to test
       const testGenAI = new GoogleGenerativeAI(apiKey.trim());
-      const testModel = testGenAI.getGenerativeModel({ model: 'gemini-2.0-flash-exp' });
       
-      // Try a simple test query
-      const testResult = await testModel.generateContent('Say "test" if you can hear me.');
-      const response = await testResult.response;
-      const text = response.text();
+      // Try multiple models in order of preference
+      // Start with most stable/widely available models first
+      const modelsToTry = [
+        'gemini-1.5-flash',      // Most stable and widely available
+        'gemini-1.5-pro',        // Stable production model
+        'gemini-2.0-flash-exp',  // Experimental (may not be available)
+        'gemini-pro'             // Legacy model (fallback)
+      ];
+      
+      let lastError: Error | null = null;
+      let testModel: any = null; // eslint-disable-line @typescript-eslint/no-explicit-any
+      
+      for (const modelName of modelsToTry) {
+        try {
+          testModel = testGenAI.getGenerativeModel({ model: modelName });
+          // Try a simple test query
+          const testResult = await testModel.generateContent('Say "test" if you can hear me.');
+          const response = await testResult.response;
+          const text = response.text();
 
-      if (text && text.length > 0) {
-        setTestResult({
-          success: true,
-          message: 'API key is valid and working! ✓'
-        });
-        toast({
-          title: "API Key Valid",
-          description: "The API key is working correctly",
-        });
+          if (text && text.length > 0) {
+            setTestResult({
+              success: true,
+              message: `API key is valid and working! ✓ (using ${modelName})`
+            });
+            toast({
+              title: "API Key Valid",
+              description: `The API key is working correctly with ${modelName}`,
+            });
+            return; // Success, exit early
+          }
+        } catch (modelError) {
+          lastError = modelError as Error;
+          console.log(`Model ${modelName} failed, trying next...`, lastError.message);
+          continue; // Try next model
+        }
+      }
+      
+      // If we get here, all models failed
+      if (lastError) {
+        throw lastError;
       } else {
-        setTestResult({
-          success: false,
-          message: 'API key returned empty response'
-        });
+        throw new Error('All models returned empty responses');
       }
     } catch (error: unknown) {
       const errorObj = error as Error;
       const errorMessage = errorObj.message || String(error);
       
+      // Log the full error for debugging
+      console.error('API key test error:', errorMessage);
+      
+      // More specific error detection - only match exact quota errors
       let userMessage = 'API key test failed';
-      if (errorMessage.includes('QUOTA_EXCEEDED') || errorMessage.includes('quota') || errorMessage.includes('429')) {
-        userMessage = 'API quota exceeded for this key';
-      } else if (errorMessage.includes('API_KEY') || errorMessage.includes('401') || errorMessage.includes('403')) {
-        userMessage = 'Invalid API key or insufficient permissions';
-      } else if (errorMessage.includes('404') || errorMessage.includes('not found')) {
-        userMessage = 'Model not found. API key may be valid but model access issue';
+      const errorUpper = errorMessage.toUpperCase();
+      
+      if (errorUpper.includes('QUOTA_EXCEEDED') || 
+          errorUpper.includes('RESOURCE_EXHAUSTED') ||
+          (errorUpper.includes('429') && errorUpper.includes('QUOTA'))) {
+        userMessage = 'API quota exceeded for this key. Please check your usage limits or wait a few minutes if you just created the key.';
+      } else if (errorUpper.includes('API_KEY') || 
+                 errorUpper.includes('401') || 
+                 errorUpper.includes('403') ||
+                 errorUpper.includes('UNAUTHORIZED') ||
+                 errorUpper.includes('PERMISSION_DENIED')) {
+        userMessage = 'Invalid API key or insufficient permissions. Please verify the key is correct and has Generative AI API enabled.';
+      } else if (errorUpper.includes('404') || 
+                 errorUpper.includes('NOT_FOUND') ||
+                 errorUpper.includes('MODEL_NOT_FOUND')) {
+        userMessage = 'Model not found. The API key may be valid but doesn\'t have access to the requested models. Please:\n1. Enable Generative AI API in Google Cloud Console\n2. Ensure your API key has the correct permissions\n3. Wait 1-2 minutes if you just created the key';
+      } else if (errorUpper.includes('RATE_LIMIT') || 
+                 errorUpper.includes('RATE_LIMIT_EXCEEDED')) {
+        userMessage = 'Rate limit exceeded. Please wait a moment and try again.';
+      } else if (errorUpper.includes('BILLING') || 
+                 errorUpper.includes('PAYMENT_REQUIRED')) {
+        userMessage = 'Billing not enabled. Please set up billing in Google Cloud Console to use the API.';
       } else {
-        userMessage = `Test failed: ${errorMessage.substring(0, 100)}`;
+        // Show more helpful message for unknown errors
+        const shortError = errorMessage.length > 150 
+          ? errorMessage.substring(0, 150) + '...' 
+          : errorMessage;
+        userMessage = `Test failed: ${shortError}. Please verify your API key is correct and has proper permissions.`;
       }
 
       setTestResult({
@@ -225,7 +272,13 @@ export const ApiKeyDialog: React.FC<ApiKeyDialogProps> = ({
                 </Button>
                 <div className="text-[10px] sm:text-xs text-muted-foreground space-y-1">
                   <p>Your API key is stored locally in your browser and never sent to our servers.</p>
-                  <p className="font-medium text-ai-primary">📊 API Usage Tips:</p>
+                  <p className="font-medium text-ai-primary">💡 For New API Keys:</p>
+                  <ul className="list-disc list-inside space-y-0.5 ml-2">
+                    <li>Newly created keys may take 1-2 minutes to activate</li>
+                    <li>Ensure billing is enabled if you see quota errors</li>
+                    <li>Verify the Generative AI API is enabled in your Google Cloud project</li>
+                  </ul>
+                  <p className="font-medium text-ai-primary mt-2">📊 API Usage Tips:</p>
                   <ul className="list-disc list-inside space-y-0.5 ml-2">
                     <li>API calls appear in Google AI Studio logs (may take 2-5 minutes)</li>
                     <li>Detailed logs require billing setup (free tier shows basic usage)</li>

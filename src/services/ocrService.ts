@@ -13,6 +13,7 @@ export interface OCRResult {
 class OCRService {
   private genAI: GoogleGenerativeAI | null = null;
   private model: any = null; // eslint-disable-line @typescript-eslint/no-explicit-any
+  private currentApiKey: string | null = null; // Store current API key for error messages
 
   isInitialized(): boolean {
     return this.model !== null;
@@ -27,6 +28,7 @@ class OCRService {
     if (this.genAI) {
       this.genAI = null;
     }
+    this.currentApiKey = null;
     // Initialize with new key
     return this.initialize(apiKey);
   }
@@ -34,8 +36,12 @@ class OCRService {
   initialize(apiKey: string): boolean {
     try {
       this.genAI = new GoogleGenerativeAI(apiKey);
+      this.currentApiKey = apiKey; // Store the current API key
+      
+      // Use gemini-1.5-flash as default - most stable and widely available
+      // If this model isn't available, errors will be handled during OCR calls
       this.model = this.genAI.getGenerativeModel({ 
-        model: 'gemini-2.0-flash-exp',
+        model: 'gemini-1.5-flash',
         generationConfig: {
           temperature: 0.1, // Lower temperature for more accurate OCR
           topK: 40,
@@ -47,7 +53,8 @@ class OCRService {
       // Log API key info for debugging (masked)
       const apiKeyPrefix = apiKey.substring(0, 8);
       const apiKeySuffix = apiKey.substring(apiKey.length - 4);
-      console.log(`✓ Initialized OCR service with API key: ${apiKeyPrefix}...${apiKeySuffix}`);
+      console.log(`✓ Initialized OCR service with model: gemini-1.5-flash`);
+      console.log(`✓ Using API key: ${apiKeyPrefix}...${apiKeySuffix}`);
       console.log(`💡 OCR API calls will be logged in Google AI Studio`);
       
       return true;
@@ -181,9 +188,9 @@ Extract and return the JSON now:`;
         }
       ];
 
-      // Log API call for debugging
-      const currentApiKey = typeof window !== 'undefined' ? localStorage.getItem('gemini_api_key') : null;
-      const apiKeyPrefix = currentApiKey ? currentApiKey.substring(0, 8) : 'unknown';
+      // Log API call for debugging - prefer service's stored key over localStorage
+      const apiKeyToUse = this.currentApiKey || (typeof window !== 'undefined' ? localStorage.getItem('gemini_api_key') : null);
+      const apiKeyPrefix = apiKeyToUse ? apiKeyToUse.substring(0, 8) : 'unknown';
       console.log(`📤 Making OCR API call with key: ${apiKeyPrefix}... (this will appear in Google AI Studio logs)`);
 
       const result = await this.model.generateContent(contentParts);
@@ -226,9 +233,9 @@ Extract and return the JSON now:`;
       const errorObj = error as Error;
       const errorMessage = errorObj.message || String(error);
       
-      // Get current API key prefix for debugging
-      const currentApiKey = typeof window !== 'undefined' ? localStorage.getItem('gemini_api_key') : null;
-      const apiKeyPrefix = currentApiKey ? currentApiKey.substring(0, 8) : 'unknown';
+      // Get current API key prefix for debugging - prefer service's stored key over localStorage
+      const apiKeyToUse = this.currentApiKey || (typeof window !== 'undefined' ? localStorage.getItem('gemini_api_key') : null);
+      const apiKeyPrefix = apiKeyToUse ? apiKeyToUse.substring(0, 8) : 'unknown';
       
       // Check for specific error types
       if (errorMessage.includes('QUOTA_EXCEEDED') || 
