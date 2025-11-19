@@ -110,41 +110,76 @@ export const ApiKeyDialog: React.FC<ApiKeyDialogProps> = ({
       }
     } catch (error: unknown) {
       const errorObj = error as Error;
-      const errorMessage = errorObj.message || String(error);
+      let errorMessage = errorObj.message || String(error);
+      
+      // Try to extract more details from the error object
+      let errorDetails = '';
+      if (errorObj && typeof errorObj === 'object') {
+        // Check for additional error properties
+        const errorAny = errorObj as any; // eslint-disable-line @typescript-eslint/no-explicit-any
+        if (errorAny.status) {
+          errorDetails += `Status: ${errorAny.status}. `;
+        }
+        if (errorAny.statusText) {
+          errorDetails += `Status Text: ${errorAny.statusText}. `;
+        }
+        if (errorAny.cause) {
+          errorDetails += `Cause: ${String(errorAny.cause)}. `;
+        }
+        // Check for Google API specific error structure
+        if (errorAny.error) {
+          const apiError = errorAny.error;
+          if (apiError.message) {
+            errorMessage = apiError.message;
+          }
+          if (apiError.status) {
+            errorDetails += `API Status: ${apiError.status}. `;
+          }
+          if (apiError.code) {
+            errorDetails += `Error Code: ${apiError.code}. `;
+          }
+        }
+      }
       
       // Log the full error for debugging
-      console.error('API key test error:', errorMessage);
+      console.error('API key test error (full):', error);
+      console.error('API key test error (message):', errorMessage);
+      console.error('API key test error (details):', errorDetails);
       
       // More specific error detection - only match exact quota errors
       let userMessage = 'API key test failed';
       const errorUpper = errorMessage.toUpperCase();
+      const detailsUpper = errorDetails.toUpperCase();
       
-      if (errorUpper.includes('QUOTA_EXCEEDED') || 
+      // Check for billing-related errors first (most common for new keys)
+      if (errorUpper.includes('BILLING') || 
+          errorUpper.includes('PAYMENT_REQUIRED') ||
+          errorUpper.includes('BILLING_NOT_ENABLED') ||
+          detailsUpper.includes('BILLING') ||
+          errorUpper.includes('403') && (errorUpper.includes('BILLING') || errorUpper.includes('PAYMENT'))) {
+        userMessage = 'Billing setup required. Even for the free tier, you need to set up billing in Google Cloud Console. Please:\n1. Go to your Google Cloud Console\n2. Click "Set up billing" for your project\n3. Complete the billing setup (free tier won\'t charge you)\n4. Wait 1-2 minutes for activation\n5. Try testing the key again';
+      } else if (errorUpper.includes('QUOTA_EXCEEDED') || 
           errorUpper.includes('RESOURCE_EXHAUSTED') ||
           (errorUpper.includes('429') && errorUpper.includes('QUOTA'))) {
         userMessage = 'API quota exceeded for this key. Please check your usage limits or wait a few minutes if you just created the key.';
       } else if (errorUpper.includes('API_KEY') || 
                  errorUpper.includes('401') || 
-                 errorUpper.includes('403') ||
-                 errorUpper.includes('UNAUTHORIZED') ||
-                 errorUpper.includes('PERMISSION_DENIED')) {
+                 (errorUpper.includes('403') && !errorUpper.includes('BILLING'))) {
         userMessage = 'Invalid API key or insufficient permissions. Please verify the key is correct and has Generative AI API enabled.';
       } else if (errorUpper.includes('404') || 
                  errorUpper.includes('NOT_FOUND') ||
                  errorUpper.includes('MODEL_NOT_FOUND')) {
-        userMessage = 'Model not found. The API key may be valid but doesn\'t have access to the requested models. Please:\n1. Enable Generative AI API in Google Cloud Console\n2. Ensure your API key has the correct permissions\n3. Wait 1-2 minutes if you just created the key';
+        // Model not found could also be a billing issue
+        userMessage = 'Model not found. This often means billing needs to be set up. Please:\n1. Set up billing in Google Cloud Console (even for free tier)\n2. Wait 1-2 minutes after setting up billing\n3. Ensure Generative AI API is enabled\n4. Try testing the key again';
       } else if (errorUpper.includes('RATE_LIMIT') || 
                  errorUpper.includes('RATE_LIMIT_EXCEEDED')) {
         userMessage = 'Rate limit exceeded. Please wait a moment and try again.';
-      } else if (errorUpper.includes('BILLING') || 
-                 errorUpper.includes('PAYMENT_REQUIRED')) {
-        userMessage = 'Billing not enabled. Please set up billing in Google Cloud Console to use the API.';
       } else {
-        // Show more helpful message for unknown errors
-        const shortError = errorMessage.length > 150 
-          ? errorMessage.substring(0, 150) + '...' 
+        // Show more helpful message with actual error details
+        const shortError = errorMessage.length > 200 
+          ? errorMessage.substring(0, 200) + '...' 
           : errorMessage;
-        userMessage = `Test failed: ${shortError}. Please verify your API key is correct and has proper permissions.`;
+        userMessage = `Test failed: ${shortError}\n\nCommon solutions:\n1. Set up billing in Google Cloud Console (required even for free tier)\n2. Wait 1-2 minutes if you just created the key\n3. Verify the API key is correct\n4. Check browser console (F12) for more details`;
       }
 
       setTestResult({
@@ -239,15 +274,19 @@ export const ApiKeyDialog: React.FC<ApiKeyDialogProps> = ({
           {testResult && (
             <Alert className={testResult.success ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}>
               <AlertDescription className="text-xs sm:text-sm">
-                <div className="flex items-center space-x-2">
+                <div className="flex items-start space-x-2">
                   {testResult.success ? (
-                    <CheckCircle2 className="w-4 h-4 text-green-600 flex-shrink-0" />
+                    <CheckCircle2 className="w-4 h-4 text-green-600 flex-shrink-0 mt-0.5" />
                   ) : (
-                    <XCircle className="w-4 h-4 text-red-600 flex-shrink-0" />
+                    <XCircle className="w-4 h-4 text-red-600 flex-shrink-0 mt-0.5" />
                   )}
-                  <span className={testResult.success ? 'text-green-800' : 'text-red-800'}>
-                    {testResult.message}
-                  </span>
+                  <div className={testResult.success ? 'text-green-800' : 'text-red-800'}>
+                    {testResult.message.split('\n').map((line, index) => (
+                      <div key={index} className={index > 0 ? 'mt-1' : ''}>
+                        {line}
+                      </div>
+                    ))}
+                  </div>
                 </div>
               </AlertDescription>
             </Alert>
@@ -274,9 +313,10 @@ export const ApiKeyDialog: React.FC<ApiKeyDialogProps> = ({
                   <p>Your API key is stored locally in your browser and never sent to our servers.</p>
                   <p className="font-medium text-ai-primary">💡 For New API Keys:</p>
                   <ul className="list-disc list-inside space-y-0.5 ml-2">
-                    <li>Newly created keys may take 1-2 minutes to activate</li>
-                    <li>Ensure billing is enabled if you see quota errors</li>
+                    <li><strong>Billing setup is required</strong> even for the free tier - click "Set up billing" in Google AI Studio</li>
+                    <li>Newly created keys may take 1-2 minutes to activate after billing setup</li>
                     <li>Verify the Generative AI API is enabled in your Google Cloud project</li>
+                    <li>Check the browser console (F12) for detailed error messages</li>
                   </ul>
                   <p className="font-medium text-ai-primary mt-2">📊 API Usage Tips:</p>
                   <ul className="list-disc list-inside space-y-0.5 ml-2">
